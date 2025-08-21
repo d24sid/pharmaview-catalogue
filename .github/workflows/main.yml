@@ -1,9 +1,9 @@
-name: Deploy React App to GitHub Pages
+name: Deploy Vite React App to GitHub Pages
 
 on:
   push:
     branches:
-      - main   # Change this if your default branch is different
+      - main   # or your default branch
 
 permissions:
   contents: read
@@ -24,11 +24,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20   # Use your preferred Node.js version
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build project
         run: npm run build
@@ -36,7 +36,7 @@ jobs:
       - name: Upload production-ready build files
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./build   # React builds into "build" folder by default
+          path: ./dist   # Vite outputs here
 
   deploy:
     environment:
