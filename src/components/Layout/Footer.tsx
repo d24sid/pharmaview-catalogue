@@ -11,8 +11,8 @@ const Footer = () => {
           {/* Company Info */}
           <div className="space-y-4">
             <Link to="/" className="flex items-center space-x-3">
-              <img src={logo} alt="PharmaView Logo" className="h-8 w-8 rounded-lg" />
-              <span className="font-poppins text-lg font-bold text-primary">PharmaView</span>
+              <img src={logo} alt="People Kind Pharma Logo" className="h-8 w-8 rounded-lg" />
+              <span className="font-poppins text-lg font-bold text-primary">People Kind Pharma</span>
             </Link>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Your trusted pharmaceutical dealer providing quality medicines and healthcare products with professional service and competitive prices.
@@ -44,7 +44,7 @@ const Footer = () => {
             <div className="space-y-3">
               <div className="flex items-center space-x-3 text-sm">
                 <Phone className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">+1 (555) 123-4567</span>
+                <span className="text-muted-foreground">+91 6200255521</span>
               </div>
               <div className="flex items-center space-x-3 text-sm">
                 <Mail className="h-4 w-4 text-primary" />
@@ -52,7 +52,7 @@ const Footer = () => {
               </div>
               <div className="flex items-start space-x-3 text-sm">
                 <MapPin className="h-4 w-4 text-primary mt-0.5" />
-                <span className="text-muted-foreground">123 Medical Plaza<br />Healthcare District<br />NY 10001</span>
+                <span className="text-muted-foreground">DANIYAWA BAZAR<br />CHILKA-PAR, HILSA ROAD<br />PATNA-801304</span>
               </div>
             </div>
           </div>
@@ -77,7 +77,7 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-border mt-8 pt-6 text-center">
           <p className="text-muted-foreground text-sm">
-            © 2024 PharmaView. All rights reserved. | Licensed Pharmaceutical Dealer
+            © 2024 People Kind Pharma. All rights reserved. | Licensed Pharmaceutical Dealer
           </p>
         </div>
       </div>

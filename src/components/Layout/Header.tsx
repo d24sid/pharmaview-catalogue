@@ -24,8 +24,8 @@ const Header = () => {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-3">
-            <img src={logo} alt="PharmaView Logo" className="h-10 w-10 rounded-lg shadow-soft" />
-            <span className="font-poppins text-xl font-bold text-primary">PharmaView</span>
+            <img src={logo} alt="People Kind Pharma Logo" className="h-10 w-10 rounded-lg shadow-soft" />
+            <span className="font-poppins text-xl font-bold text-primary">People Kind Pharma</span>
           </Link>
 
           {/* Desktop Navigation */}

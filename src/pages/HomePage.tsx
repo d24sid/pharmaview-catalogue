@@ -113,7 +113,7 @@ const HomePage = () => {
       <section className="py-16 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-poppins font-bold mb-4">Why Choose PharmaView?</h2>
+            <h2 className="text-3xl font-poppins font-bold mb-4">Why Choose People Kind Pharma?</h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               We're committed to providing the highest quality pharmaceutical products and services 
               to healthcare professionals and institutions.

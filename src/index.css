@@ -1,9 +1,11 @@
+/* Pharma Healthcare Design System - Professional & Trustworthy */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* stylelint-disable at-rule-no-unknown */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Pharma Healthcare Design System - Professional & Trustworthy */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+/* stylelint-enable at-rule-no-unknown */
 
 @layer base {
   :root {
