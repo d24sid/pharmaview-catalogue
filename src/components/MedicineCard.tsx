@@ -76,10 +76,11 @@ const MedicineCard = ({ medicine, viewMode }: MedicineCardProps) => {
                     {medicine.description}
                   </p>
                 </div>
+                {medicine.price}
 
                 <div className="text-right space-y-3">
                   <div>
-                    <div className="text-2xl font-bold text-primary">${medicine.price}</div>
+                    <div className="text-2xl font-bold text-primary">₹ {medicine.price}</div>
                     <div className="text-xs text-muted-foreground">{medicine.dosage} • {medicine.form}</div>
                     <div className="text-xs text-muted-foreground">Stock: {medicine.stock}</div>
                   </div>

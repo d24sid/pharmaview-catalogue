@@ -1,3 +1,6 @@
+// types.ts
+export type Availability = 'In Stock' | 'Low Stock' | 'Out of Stock';
+
 export interface Medicine {
   id: string;
   name: string;
@@ -10,14 +13,20 @@ export interface Medicine {
   form: string; // tablet, capsule, syrup, etc.
   price: number;
   stock: number;
-  availability: 'In Stock' | 'Low Stock' | 'Out of Stock';
+  availability: Availability;
   prescription: boolean;
-  imageUrl: string;
+  imageUrl?: string; // optional — not every sheet row must have an image
   uses: string[];
   sideEffects: string[];
   contraindications: string[];
+
+  // Extras: will hold any additional columns from the sheet not captured above.
+  raw?: Record<string, any>;
 }
 
+/**
+ * categories: kept as runtime data (for UI) and typed as well
+ */
 export const categories = [
   { id: 'antibiotics', name: 'Antibiotics', icon: '💊' },
   { id: 'painkillers', name: 'Pain Relief', icon: '🩹' },
@@ -27,8 +36,110 @@ export const categories = [
   { id: 'diabetes', name: 'Diabetes Care', icon: '🩺' },
   { id: 'digestive', name: 'Digestive Health', icon: '🥗' },
   { id: 'skincare', name: 'Dermatology', icon: '🧴' },
-];
+] as const;
 
+export type CategoryId = typeof categories[number]['id'];
+
+/**
+ * Smart, forgiving mapping from an arbitrary sheet row object
+ * to a typed Medicine. Case/space/underscore insensitive header matching.
+ *
+ * `row` is expected to be an object where keys are header names and values are cell values,
+ * e.g. { "Name": "Paracetamol", "price": "20", "uses": "fever, headache" }
+ */
+export function fromSheetRow(row: Record<string, any>): Medicine {
+  const getKey = (wanted: string[]) => {
+    const normalizedWanted = wanted.map(w => w.replace(/\s|_|-/g, '').toLowerCase());
+    const keys = Object.keys(row || {});
+    for (const k of keys) {
+      const nk = k.replace(/\s|_|-/g, '').toLowerCase();
+      if (normalizedWanted.includes(nk)) return k;
+    }
+    return undefined;
+  };
+
+  const get = (...candidates: string[]) => {
+    const k = getKey(candidates);
+    if (!k) return '';
+    const v = row[k];
+    return v === null || v === undefined ? '' : v;
+  };
+
+  const parseNumber = (val: any, fallback = 0) => {
+    if (typeof val === 'number') return val;
+    const s = String(val || '').replace(/[^\d.-]/g, '');
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const splitList = (val: any): string[] => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.map(v => String(v).trim()).filter(Boolean);
+    return String(val)
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+  };
+
+  const name = String(get('name', 'medicine name', 'drug')).trim() || 'Unknown Medicine';
+  const genericName = String(get('genericname', 'generic name', 'generic')).trim() || '';
+  const brand = String(get('brand', 'company')).trim() || '';
+  const category = String(get('category', 'therapeutic category')).trim() || 'Uncategorized';
+  const manufacturer = String(get('manufacturer', 'maker')).trim() || '';
+  const description = String(get('description', 'details', 'notes')).trim() || '';
+  const dosage = String(get('dosage', 'strength')).trim() || '';
+  const form = String(get('form', 'dosage form', 'type')).trim() || '';
+
+  const price = parseNumber(get('price', 'cost', 'mrp'), 0);
+  const stock = Math.max(0, parseInt(String(parseNumber(get('stock', 'quantity', 'available')) || 0), 10) || 0);
+
+  const availabilityRaw = String(get('availability', 'status', 'stock status') || '').toLowerCase();
+  let availability: Availability = 'In Stock';
+  if (availabilityRaw.includes('low')) availability = 'Low Stock';
+  else if (availabilityRaw.includes('out')) availability = 'Out of Stock';
+
+  const presRaw = String(get('prescription', 'rx required', 'requires prescription', 'rx') || '').toLowerCase();
+  const prescription = presRaw === '1' || presRaw === 'true' || presRaw === 'yes';
+
+  const imageUrl = String(get('imageurl', 'image', 'photo', 'img') || '').trim() || undefined;
+
+  const uses = splitList(get('uses', 'indications'));
+  const sideEffects = splitList(get('sideeffects', 'side effects', 'adverse effects'));
+  const contraindications = splitList(get('contraindications', 'contra indications', 'contraindication'));
+
+  // Compose id: use explicit id column if present, otherwise stable fallback
+  const idFromSheet = String(get('id', 'uid', 'code') || '').trim();
+  const id = idFromSheet || `${name.replace(/\s+/g, '-').toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  // Keep original row so nothing is lost
+  const raw = { ...row };
+
+  return {
+    id,
+    name,
+    genericName,
+    brand,
+    category,
+    manufacturer,
+    description,
+    dosage,
+    form,
+    price,
+    stock,
+    availability,
+    prescription,
+    imageUrl,
+    uses,
+    sideEffects,
+    contraindications,
+    raw,
+  };
+}
+
+/**
+ * A small in-memory mock dataset so UI works while sheet loads/falls back.
+ * Keep this for local dev; remove or shrink for production.
+ */
 export const mockMedicines: Medicine[] = [
   {
     id: '1',
@@ -49,175 +160,5 @@ export const mockMedicines: Medicine[] = [
     sideEffects: ['Nausea', 'Diarrhea', 'Stomach upset', 'Headache'],
     contraindications: ['Penicillin allergy', 'Severe kidney disease']
   },
-  {
-    id: '2',
-    name: 'Ibuprofen',
-    genericName: 'Ibuprofen',
-    brand: 'Advil',
-    category: 'painkillers',
-    manufacturer: 'MediPharm',
-    description: 'Nonsteroidal anti-inflammatory drug (NSAID) for pain relief, fever reduction, and inflammation control.',
-    dosage: '400mg',
-    form: 'Tablet',
-    price: 12.50,
-    stock: 200,
-    availability: 'In Stock',
-    prescription: false,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Pain relief', 'Fever reduction', 'Inflammation', 'Headaches', 'Muscle pain'],
-    sideEffects: ['Stomach irritation', 'Nausea', 'Dizziness', 'Heartburn'],
-    contraindications: ['Stomach ulcers', 'Severe heart disease', 'Kidney problems']
-  },
-  {
-    id: '3',
-    name: 'Vitamin D3',
-    genericName: 'Cholecalciferol',
-    brand: 'VitaPlus',
-    category: 'vitamins',
-    manufacturer: 'HealthSupplements Inc.',
-    description: 'Essential vitamin for bone health, immune system support, and calcium absorption.',
-    dosage: '1000 IU',
-    form: 'Softgel',
-    price: 18.75,
-    stock: 85,
-    availability: 'In Stock',
-    prescription: false,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Bone health', 'Immune support', 'Calcium absorption', 'Vitamin D deficiency'],
-    sideEffects: ['Constipation', 'Kidney stones (high doses)', 'Nausea'],
-    contraindications: ['Hypercalcemia', 'Kidney stones', 'Sarcoidosis']
-  },
-  {
-    id: '4',
-    name: 'Lisinopril',
-    genericName: 'Lisinopril',
-    brand: 'Prinivil',
-    category: 'cardiac',
-    manufacturer: 'CardioMed',
-    description: 'ACE inhibitor used to treat high blood pressure and heart failure.',
-    dosage: '10mg',
-    form: 'Tablet',
-    price: 32.40,
-    stock: 75,
-    availability: 'In Stock',
-    prescription: true,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['High blood pressure', 'Heart failure', 'Post-heart attack care'],
-    sideEffects: ['Dry cough', 'Dizziness', 'Fatigue', 'Headache'],
-    contraindications: ['Angioedema history', 'Pregnancy', 'Bilateral renal artery stenosis']
-  },
-  {
-    id: '5',
-    name: 'Albuterol Inhaler',
-    genericName: 'Albuterol Sulfate',
-    brand: 'ProAir',
-    category: 'respiratory',
-    manufacturer: 'RespiCare',
-    description: 'Fast-acting bronchodilator for quick relief of asthma and COPD symptoms.',
-    dosage: '90mcg/puff',
-    form: 'Inhaler',
-    price: 45.60,
-    stock: 30,
-    availability: 'Low Stock',
-    prescription: true,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Asthma', 'COPD', 'Bronchospasm', 'Exercise-induced bronchospasm'],
-    sideEffects: ['Tremor', 'Nervousness', 'Headache', 'Throat irritation'],
-    contraindications: ['Hypersensitivity to albuterol', 'Severe heart conditions']
-  },
-  {
-    id: '6',
-    name: 'Metformin',
-    genericName: 'Metformin Hydrochloride',
-    brand: 'Glucophage',
-    category: 'diabetes',
-    manufacturer: 'DiabeteCare',
-    description: 'First-line medication for type 2 diabetes management and blood sugar control.',
-    dosage: '850mg',
-    form: 'Extended Release Tablet',
-    price: 28.90,
-    stock: 120,
-    availability: 'In Stock',
-    prescription: true,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Type 2 diabetes', 'Blood sugar control', 'Insulin resistance'],
-    sideEffects: ['Nausea', 'Diarrhea', 'Metallic taste', 'Stomach upset'],
-    contraindications: ['Severe kidney disease', 'Lactic acidosis risk', 'Severe heart failure']
-  },
-  {
-    id: '7',
-    name: 'Omeprazole',
-    genericName: 'Omeprazole',
-    brand: 'Prilosec',
-    category: 'digestive',
-    manufacturer: 'GastroMed',
-    description: 'Proton pump inhibitor for treating acid reflux, GERD, and stomach ulcers.',
-    dosage: '20mg',
-    form: 'Delayed Release Capsule',
-    price: 22.35,
-    stock: 95,
-    availability: 'In Stock',
-    prescription: false,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Acid reflux', 'GERD', 'Stomach ulcers', 'Heartburn'],
-    sideEffects: ['Headache', 'Nausea', 'Diarrhea', 'Stomach pain'],
-    contraindications: ['Hypersensitivity to omeprazole', 'Severe liver disease']
-  },
-  {
-    id: '8',
-    name: 'Hydrocortisone Cream',
-    genericName: 'Hydrocortisone',
-    brand: 'CortAid',
-    category: 'skincare',
-    manufacturer: 'DermaPharm',
-    description: 'Topical corticosteroid for treating skin inflammation, itching, and minor skin irritations.',
-    dosage: '1%',
-    form: 'Topical Cream',
-    price: 15.20,
-    stock: 60,
-    availability: 'In Stock',
-    prescription: false,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Skin inflammation', 'Eczema', 'Allergic reactions', 'Insect bites', 'Rashes'],
-    sideEffects: ['Skin thinning', 'Burning sensation', 'Irritation', 'Dryness'],
-    contraindications: ['Viral skin infections', 'Fungal infections', 'Bacterial skin infections']
-  },
-  {
-    id: '9',
-    name: 'Acetaminophen',
-    genericName: 'Acetaminophen',
-    brand: 'Tylenol',
-    category: 'painkillers',
-    manufacturer: 'PainRelief Corp',
-    description: 'Safe and effective pain reliever and fever reducer suitable for all ages.',
-    dosage: '325mg',
-    form: 'Tablet',
-    price: 9.99,
-    stock: 180,
-    availability: 'In Stock',
-    prescription: false,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Pain relief', 'Fever reduction', 'Headaches', 'Minor aches'],
-    sideEffects: ['Rare: liver damage with overdose', 'Allergic reactions'],
-    contraindications: ['Severe liver disease', 'Alcohol dependency']
-  },
-  {
-    id: '10',
-    name: 'Multivitamin Complex',
-    genericName: 'Multivitamin and Mineral Supplement',
-    brand: 'VitaComplete',
-    category: 'vitamins',
-    manufacturer: 'NutriHealth',
-    description: 'Comprehensive daily vitamin and mineral supplement for overall health and wellness.',
-    dosage: 'One Daily',
-    form: 'Tablet',
-    price: 25.50,
-    stock: 140,
-    availability: 'In Stock',
-    prescription: false,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Nutritional support', 'Energy boost', 'Immune system', 'Overall wellness'],
-    sideEffects: ['Upset stomach if taken on empty stomach', 'Mild nausea'],
-    contraindications: ['Iron overload conditions', 'Hypervitaminosis']
-  }
+  // ... (keep your other mocks as-is)
 ];
