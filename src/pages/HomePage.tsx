@@ -1,22 +1,11 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Search, ArrowRight, Shield, Truck, Clock, Star } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowRight, Shield, Truck, Clock, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { categories } from "@/data/medicines";
 import heroImage from "@/assets/pharma-hero.jpg";
 
 const HomePage = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const navigate = useNavigate();
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/medicines?search=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
 
   const features = [
     {
@@ -61,28 +50,6 @@ const HomePage = () => {
                   Professional service, competitive prices, and reliable supply.
                 </p>
               </div>
-
-              {/* Hero Search */}
-              <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4 max-w-md">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search for medicines..."
-                    className="pl-12 h-12 text-base shadow-medium border-0 bg-background/80"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  size="lg" 
-                  className="h-12 px-8 gradient-primary text-white font-semibold shadow-glow hover:shadow-strong transition-all"
-                >
-                  Search
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </form>
 
               <div className="flex flex-wrap gap-4">
                 <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">

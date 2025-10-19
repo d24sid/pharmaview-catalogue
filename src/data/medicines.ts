@@ -40,19 +40,29 @@ export const categories = [
 
 export type CategoryId = typeof categories[number]['id'];
 
+/* ---------------------------
+ * Sheet row conversion helpers
+ * --------------------------- */
+
 /**
  * Smart, forgiving mapping from an arbitrary sheet row object
- * to a typed Medicine. Case/space/underscore insensitive header matching.
+ * to a typed Medicine. Case/space/underscore/extra-char insensitive header matching.
  *
  * `row` is expected to be an object where keys are header names and values are cell values,
  * e.g. { "Name": "Paracetamol", "price": "20", "uses": "fever, headache" }
  */
 export function fromSheetRow(row: Record<string, any>): Medicine {
+  // normalize any header/value: keep only alphanumeric, lowercase
+  const normalize = (s: any) =>
+    String(s ?? '')
+      .replace(/[^a-z0-9]/gi, '') // remove everything except letters and digits
+      .toLowerCase();
+
   const getKey = (wanted: string[]) => {
-    const normalizedWanted = wanted.map(w => w.replace(/\s|_|-/g, '').toLowerCase());
+    const normalizedWanted = wanted.map(w => normalize(w));
     const keys = Object.keys(row || {});
     for (const k of keys) {
-      const nk = k.replace(/\s|_|-/g, '').toLowerCase();
+      const nk = normalize(k);
       if (normalizedWanted.includes(nk)) return k;
     }
     return undefined;
@@ -62,7 +72,7 @@ export function fromSheetRow(row: Record<string, any>): Medicine {
     const k = getKey(candidates);
     if (!k) return '';
     const v = row[k];
-    return v === null || v === undefined ? '' : v;
+    return v === null || v === undefined ? '' : String(v).trim();
   };
 
   const parseNumber = (val: any, fallback = 0) => {
@@ -81,34 +91,35 @@ export function fromSheetRow(row: Record<string, any>): Medicine {
       .filter(Boolean);
   };
 
-  const name = String(get('name', 'medicine name', 'drug')).trim() || 'Unknown Medicine';
-  const genericName = String(get('genericname', 'generic name', 'generic')).trim() || '';
-  const brand = String(get('brand', 'company')).trim() || '';
-  const category = String(get('category', 'therapeutic category')).trim() || 'Uncategorized';
-  const manufacturer = String(get('manufacturer', 'maker')).trim() || '';
-  const description = String(get('description', 'details', 'notes')).trim() || '';
-  const dosage = String(get('dosage', 'strength')).trim() || '';
-  const form = String(get('form', 'dosage form', 'type')).trim() || '';
+  // --- Core field mapping ---
+  const name = get('name', 'medicine name', 'drug', 'product name', 'productname', 'Product Name') || '';
+  const genericName = get('genericname', 'generic name', 'generic') || '';
+  const brand = get('brand', 'company', 'marketer') || '';
+  const category = get('category', 'therapeutic category') || 'Uncategorized';
+  const manufacturer = get('manufacturer', 'maker') || '';
+  const description = get('description', 'details', 'notes') || '';
+  const dosage = get('dosage', 'strength') || '';
+  const form = get('form', 'dosage form', 'type') || '';
 
   const price = parseNumber(get('price', 'cost', 'mrp'), 0);
-  const stock = Math.max(0, parseInt(String(parseNumber(get('stock', 'quantity', 'available')) || 0), 10) || 0);
+  const stock = Math.max(0, parseInt(String(parseNumber(get('stock', 'quantity', 'available') || 0)), 10) || 0);
 
-  const availabilityRaw = String(get('availability', 'status', 'stock status') || '').toLowerCase();
+  const availabilityRaw = (get('availability', 'status', 'stock status') || '').toLowerCase();
   let availability: Availability = 'In Stock';
   if (availabilityRaw.includes('low')) availability = 'Low Stock';
   else if (availabilityRaw.includes('out')) availability = 'Out of Stock';
 
-  const presRaw = String(get('prescription', 'rx required', 'requires prescription', 'rx') || '').toLowerCase();
-  const prescription = presRaw === '1' || presRaw === 'true' || presRaw === 'yes';
+  const presRaw = (get('prescription', 'rx required', 'requires prescription', 'rx') || '').toLowerCase();
+  const prescription = presRaw === '1' || presRaw === 'true' || presRaw === 'yes' || presRaw === 'y';
 
-  const imageUrl = String(get('imageurl', 'image', 'photo', 'img') || '').trim() || undefined;
+  const imageUrl = (get('imageurl', 'image', 'photo', 'img') || '').trim() || undefined;
 
   const uses = splitList(get('uses', 'indications'));
   const sideEffects = splitList(get('sideeffects', 'side effects', 'adverse effects'));
-  const contraindications = splitList(get('contraindications', 'contra indications', 'contraindication'));
+  const contraindications = splitList(get('contraindications', 'contra indications', 'contraindication', 'contraindications', 'contrainDications'));
 
   // Compose id: use explicit id column if present, otherwise stable fallback
-  const idFromSheet = String(get('id', 'uid', 'code') || '').trim();
+  const idFromSheet = (get('id', 'uid', 'code') || '').trim();
   const id = idFromSheet || `${name.replace(/\s+/g, '-').toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`;
 
   // Keep original row so nothing is lost
@@ -136,29 +147,67 @@ export function fromSheetRow(row: Record<string, any>): Medicine {
   };
 }
 
-/**
- * A small in-memory mock dataset so UI works while sheet loads/falls back.
- * Keep this for local dev; remove or shrink for production.
+/* -------------------------------------------------------
+ * Google Visualization (gviz) response -> plain row objects
+ * -------------------------------------------------------
+ *
+ * Accepts the object passed into google.visualization.Query.setResponse(...)
+ * and converts it into an array of simple { header: value } objects.
+ *
+ * Notes:
+ * - Uses 'f' (formatted value) if present, otherwise 'v' (raw value).
+ * - Treats null cells as ''.
+ * - Converts numeric cells' v to number, but if 'f' exists uses string from 'f'.
  */
-export const mockMedicines: Medicine[] = [
-  {
-    id: '1',
-    name: 'Amoxicillin',
-    genericName: 'Amoxicillin Trihydrate',
-    brand: 'Amoxil',
-    category: 'antibiotics',
-    manufacturer: 'PharmaCorp',
-    description: 'Broad-spectrum antibiotic used to treat various bacterial infections including respiratory tract, urinary tract, and skin infections.',
-    dosage: '500mg',
-    form: 'Capsule',
-    price: 24.99,
-    stock: 150,
-    availability: 'In Stock',
-    prescription: true,
-    imageUrl: '/src/assets/medicine-generic.jpg',
-    uses: ['Bacterial infections', 'Respiratory infections', 'Urinary tract infections', 'Skin infections'],
-    sideEffects: ['Nausea', 'Diarrhea', 'Stomach upset', 'Headache'],
-    contraindications: ['Penicillin allergy', 'Severe kidney disease']
-  },
-  // ... (keep your other mocks as-is)
-];
+export function gvizResponseToRows(gvizResponse: any): Record<string, any>[] {
+  if (!gvizResponse || !gvizResponse.table) return [];
+
+  const cols = gvizResponse.table.cols || [];
+  const rows = gvizResponse.table.rows || [];
+
+  // Build header labels: prefer the 'label' property, fallback to 'id' or index
+  const headers = cols.map((c: any, idx: number) => {
+    if (c && c.label) return String(c.label).trim();
+    if (c && c.id) return String(c.id).trim();
+    return `col${idx}`;
+  });
+
+  const result: Record<string, any>[] = [];
+
+  for (const r of rows) {
+    const cells = Array.isArray(r.c) ? r.c : [];
+    const rowObj: Record<string, any> = {};
+
+    for (let i = 0; i < headers.length; i++) {
+      const header = headers[i] ?? `col${i}`;
+      const cell = cells[i];
+
+      if (!cell) {
+        rowObj[header] = '';
+        continue;
+      }
+
+      // Prefer formatted value 'f' if provided (user-facing string), else use 'v'
+      if (cell.f !== undefined && cell.f !== null) {
+        rowObj[header] = cell.f;
+      } else {
+        // If v is null/undefined, treat as empty string
+        if (cell.v === null || cell.v === undefined) rowObj[header] = '';
+        else rowObj[header] = cell.v;
+      }
+    }
+
+    result.push(rowObj);
+  }
+
+  return result;
+}
+
+/**
+ * Convenience: parse gviz response straight into Medicine[] using fromSheetRow
+ */
+export function medicinesFromGviz(gvizResponse: any): Medicine[] {
+  const plainRows = gvizResponseToRows(gvizResponse);
+  return plainRows.map(r => fromSheetRow(r));
+}
+

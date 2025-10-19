@@ -1,471 +1,381 @@
-// MedicinesPage.tsx
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Search, Filter, Grid, List, ChevronDown, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { mockMedicines, categories, Medicine as MedicineType } from "@/data/medicines";
-import MedicineCard from "@/components/MedicineCard";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import MedicineCard from '../components/MedicineCard';
+import { Search, X, List, LayoutGrid, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+// import { useMedicines } from '@/hooks/useMedicines';
+import { useDebounce } from '@/hooks/useDebounce';
+import { MedicineCardSkeleton } from '@/components/Skeleton';
+import Pagination from '@/components/Pagination';
+import { parseGvizText } from '@/services/gvizService';
+import { gvizResponseToRows } from '@/data/medicines';
+import { mapRowsToMedicines } from '@/services/dataMapping';
+import { Medicine } from '@/services/types';
 
-/* ----------------------------- Config / constants ---------------------------- */
-const SPREADSHEET_ID = "1ZDO0G2YTgxcXrK-Zw4sBofPXtcdsvirrSs4fKdnZIQI";
-const GID = 0;
-const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
-const CACHE_KEY = `sheet_cache_${SPREADSHEET_ID}_${GID}`;
+const ITEMS_PER_PAGE = 24;
 
-/* ------------------------------- Utilities --------------------------------- */
-function parseGviz(respText: string) {
-  // strip google wrapper: /**/ google.visualization.Query.setResponse({...});
-  const jsonText = respText.replace(/^[^\(]*\(|\);?$/g, "");
-  return JSON.parse(jsonText);
-}
+const safeString = (v: any) => (v ? String(v) : '');
 
-/**
- * Forgiving mapper from a sheet row (headers -> values) to your typed MedicineType
- */
-function mapRowToMedicine(row: Record<string, any>): MedicineType {
-  const getKey = (candidates: string[]) => {
-    const normalizedWanted = candidates.map(s => s.replace(/\s|_|-/g, '').toLowerCase());
-    for (const k of Object.keys(row || {})) {
-      const nk = k.replace(/\s|_|-/g, '').toLowerCase();
-      if (normalizedWanted.includes(nk)) return k;
-    }
-    return undefined;
-  };
-
-  const get = (...aliases: string[]) => {
-    const key = getKey(aliases);
-    if (!key) return "";
-    const v = row[key];
-    return v === null || v === undefined ? "" : v;
-  };
-
-  const parseNumber = (v: any, fallback = 0) => {
-    if (typeof v === "number") return v;
-    const s = String(v || "").replace(/[^\d.-]/g, "");
-    const n = parseFloat(s);
-    return Number.isFinite(n) ? n : fallback;
-  };
-
-  const splitList = (v: any) => {
-    if (!v) return [] as string[];
-    if (Array.isArray(v)) return v.map(x => String(x).trim()).filter(Boolean);
-    return String(v).split(",").map(x => x.trim()).filter(Boolean);
-  };
-
-  const name = String(get("name", "medicine name", "drug") || "").trim() || "Unknown Medicine";
-  const genericName = String(get("genericName", "generic name", "generic") || "").trim();
-  const brand = String(get("brand", "company") || "").trim();
-  const category = String(get("category", "therapeutic category") || "").trim() || "Uncategorized";
-  const manufacturer = String(get("manufacturer", "maker", "manufacturer name") || "").trim();
-  const description = String(get("description", "details", "notes") || "").trim();
-  const dosage = String(get("dosage", "strength") || "").trim();
-  const form = String(get("form", "dosage form", "type") || "").trim();
-
-  const price = parseNumber(get("price", "cost", "mrp"), 0);
-  const stock = Math.max(0, parseInt(String(parseNumber(get("stock", "quantity", "available")) || 0), 10) || 0);
-
-  const availabilityRaw = String(get("availability", "status", "stock status") || "").toLowerCase();
-  let availability: MedicineType["availability"] = "In Stock";
-  if (availabilityRaw.includes("low")) availability = "Low Stock";
-  else if (availabilityRaw.includes("out")) availability = "Out of Stock";
-
-  const presRaw = String(get("prescription", "rx required", "requires prescription", "rx") || "").toLowerCase();
-  const prescription = presRaw === "1" || presRaw === "true" || presRaw === "yes";
-
-  const imageUrl = String(get("imageUrl", "image", "photo", "img") || "").trim() || undefined;
-
-  const uses = splitList(get("uses", "indications"));
-  const sideEffects = splitList(get("sideEffects", "side effects", "adverse effects"));
-  const contraindications = splitList(get("contraindications", "contra indications", "contraindication"));
-
-  const idFromSheet = String(get("id", "uid", "code") || "").trim();
-  const id = idFromSheet || `${name.replace(/\s+/g, "-").toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`;
-
-  return {
-    id,
-    name,
-    genericName,
-    brand,
-    category,
-    manufacturer,
-    description,
-    dosage,
-    form,
-    price,
-    stock,
-    availability,
-    prescription,
-    imageUrl,
-    uses,
-    sideEffects,
-    contraindications,
-    raw: { ...row },
-  } as MedicineType;
-}
-
-/* ------------------------------- Hooks ------------------------------------ */
-/** tiny debounce hook */
-function useDebounced<T>(value: T, delay = 250) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return debounced;
-}
-
-/* ------------------------------ Component --------------------------------- */
-const MedicinesPage = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // UI state
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
-  const debouncedSearch = useDebounced(searchQuery, 250);
-
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") || "all");
-  const [selectedManufacturer, setSelectedManufacturer] = useState("all");
-  const [priceRange, setPriceRange] = useState("all");
-  const [sortBy, setSortBy] = useState("name");
-  const [showFilters, setShowFilters] = useState(false);
-
-  // data state
-  const [medicines, setMedicines] = useState<MedicineType[]>(mockMedicines || []);
-  const [loading, setLoading] = useState<boolean>(true);
+const MedicinesPage: React.FC = () => {
+  // const { medicines = [], loading, error, refetch } = useMedicines();
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState(0); // bump to force re-fetch
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [manufacturerFilter, setManufacturerFilter] = useState('all');
+  const [prescriptionFilter, setPrescriptionFilter] = useState(false);
+  const [sortOrder, setSortOrder] = useState('name-asc');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [currentPage, setCurrentPage] = useState(1);
 
-  /* ------------------------- Fetch + cache effect ------------------------- */
-  useEffect(() => {
-    let mounted = true;
-    const controller = new AbortController();
+  // Nice-to-have toggle: "Load more" vs classic pagination
+  const [useLoadMore, setUseLoadMore] = useState(false);
+  const [itemsToShow, setItemsToShow] = useState(ITEMS_PER_PAGE);
 
-    async function loadSheet() {
-      try {
-        setLoading(true);
-        setError(null);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const CACHE_KEY = 'pharma_medicines_cache';
 
-        // check cache
-        try {
-          const cachedRaw = localStorage.getItem(CACHE_KEY);
-          if (cachedRaw) {
-            const parsed = JSON.parse(cachedRaw);
-            if (Date.now() - parsed.ts < CACHE_TTL_MS && Array.isArray(parsed.data)) {
-              if (mounted) {
-                setMedicines(parsed.data);
-                setLoading(false);
-                return;
-              }
-            } else {
-              localStorage.removeItem(CACHE_KEY);
-            }
-          }
-        } catch (e) {
-          // ignore localStorage errors
-        }
+  const fetchAndProcessData = useCallback(async () => {
 
-        const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
-        const res = await fetch(url, { signal: controller.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const url = `https://docs.google.com/spreadsheets/d/1ZDO0G2YTgxcXrK-Zw4sBofPXtcdsvirrSs4fKdnZIQI/gviz/tq?tqx=out:json&gid=0`;
 
-        const text = await res.text();
-        const parsed = parseGviz(text);
-        const table = parsed.table;
-        const headers: string[] = table.cols.map((c: any) => (c.label || c.id || "").toString().trim());
-
-        const rows: Record<string, any>[] = table.rows.map((r: any) => {
-          const obj: Record<string, any> = {};
-          headers.forEach((h, i) => {
-            const key = h || `col${i}`;
-            const cell = (r.c && r.c[i]) || null;
-            obj[key] = cell ? cell.v : "";
-          });
-          return obj;
-        });
-
-        const mapped = rows.map(mapRowToMedicine);
-        if (mounted) {
-          setMedicines(mapped.length ? mapped : mockMedicines);
-          setLoading(false);
-          try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: mapped }));
-          } catch (e) {
-            // ignore storage errors
-          }
-        }
-      } catch (err: any) {
-        if (err.name === "AbortError") return;
-        console.error("Failed to fetch sheet", err);
-        if (mounted) {
-          setError("Failed to load sheet data. Using fallback dataset.");
-          setMedicines(mockMedicines || []);
-          setLoading(false);
-        }
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Network response was not ok: ${response.statusText}`);
       }
+      const text = await response.text();
+      const gvizResponse = parseGvizText(text);
+      const rows = gvizResponseToRows(gvizResponse);
+      const mappedMedicines = mapRowsToMedicines(rows);
+
+      const now = new Date();
+      setMedicines(mappedMedicines);
+
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        timestamp: now.getTime(),
+        data: mappedMedicines,
+      }));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      console.error("Failed to fetch or process medicines data:", err);
+      setError(errorMessage);
+      // Fallback to cache if fetching fails
+      // loadFromCache(true);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    loadSheet();
-
-    return () => {
-      mounted = false;
-      controller.abort();
+  // keyboard shortcut "/" to focus search (but not when typing into inputs)
+  useEffect(() => {
+    fetchAndProcessData();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === '/' && (document.activeElement?.tagName ?? '').toLowerCase() !== 'input') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
     };
-    // refreshToken in deps allows manual refresh
-  }, [refreshToken]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
-  /* -------------------------- Derived data / filters ---------------------- */
-  const manufacturers = useMemo(() => {
-    const unique = [...new Set(medicines.map(m => m.manufacturer || "Unknown"))];
-    return unique.sort();
+  // derive unique categories / manufacturers defensively
+  const { uniqueCategories, uniqueManufacturers } = useMemo(() => {
+    const categories = new Set<string>();
+    const manufacturers = new Set<string>();
+    for (const med of medicines) {
+      const c = safeString(med.category).trim();
+      const m = safeString(med.manufacturer).trim();
+      if (c) categories.add(c);
+      if (m) manufacturers.add(m);
+    }
+    return {
+      uniqueCategories: Array.from(categories).sort((a, b) => a.localeCompare(b)),
+      uniqueManufacturers: Array.from(manufacturers).sort((a, b) => a.localeCompare(b)),
+    };
   }, [medicines]);
 
-  const filteredMedicines = useMemo(() => {
-    const q = String(debouncedSearch || "").toLowerCase().trim();
+  // filter + sort
+  const filteredAndSortedMedicines = useMemo(() => {
+    const searchLower = debouncedSearchTerm.trim().toLowerCase();
+    const filtered = medicines.filter((med) => {
+      // guard for missing fields
+      const name = safeString(med.name).toLowerCase();
+      const generic = safeString(med.genericName).toLowerCase();
+      const brand = safeString(med.brand).toLowerCase();
 
-    let filtered = medicines.filter(medicine => {
-      const name = (medicine.name || "").toLowerCase();
-      const generic = (medicine.genericName || "").toLowerCase();
-      const brand = (medicine.brand || "").toLowerCase();
+      const matchesSearch =
+        !searchLower ||
+        name.includes(searchLower) ||
+        generic.includes(searchLower) ||
+        brand.includes(searchLower);
 
-      const matchesSearch = !q || name.includes(q) || generic.includes(q) || brand.includes(q);
-      const matchesCategory = selectedCategory === "all" || medicine.category === selectedCategory;
-      const matchesManufacturer = selectedManufacturer === "all" || medicine.manufacturer === selectedManufacturer;
+      const matchesCategory = categoryFilter === 'all' || safeString(med.category) === categoryFilter;
+      const matchesManufacturer = manufacturerFilter === 'all' || safeString(med.manufacturer) === manufacturerFilter;
+      const matchesPrescription = !prescriptionFilter || med.prescription === true;
 
-      let matchesPrice = true;
-      if (priceRange !== "all") {
-        const price = Number(medicine.price || 0);
-        switch (priceRange) {
-          case "under-20":
-            matchesPrice = price < 20;
-            break;
-          case "20-50":
-            matchesPrice = price >= 20 && price <= 50;
-            break;
-          case "over-50":
-            matchesPrice = price > 50;
-            break;
-        }
-      }
-
-      return matchesSearch && matchesCategory && matchesManufacturer && matchesPrice;
+      return matchesSearch && matchesCategory && matchesManufacturer && matchesPrescription;
     });
 
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "name":
-          return (a.name || "").localeCompare(b.name || "");
-        case "price-low":
-          return (a.price || 0) - (b.price || 0);
-        case "price-high":
-          return (b.price || 0) - (a.price || 0);
-        case "availability":
-          return String(a.availability || "").localeCompare(String(b.availability || ""));
-        default:
-          return 0;
+    const sorted = filtered.sort((a, b) => {
+      switch (sortOrder) {
+        case 'price-asc': return (a.price ?? 0) - (b.price ?? 0);
+        case 'price-desc': return (b.price ?? 0) - (a.price ?? 0);
+        case 'availability': return (b.stock ?? 0) - (a.stock ?? 0);
+        case 'name-desc': return safeString(b.name).localeCompare(safeString(a.name));
+        default: return safeString(a.name).localeCompare(safeString(b.name));
       }
     });
 
-    return filtered;
-  }, [medicines, debouncedSearch, selectedCategory, selectedManufacturer, priceRange, sortBy]);
+    return sorted;
+  }, [medicines, debouncedSearchTerm, categoryFilter, manufacturerFilter, prescriptionFilter, sortOrder]);
 
-  /* ------------------------- URL search params helpers -------------------- */
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchQuery(value);
+  // pagination / load more handling
+  useEffect(() => {
+    // whenever filters/search/change, reset to first page or reset itemsToShow
+    setCurrentPage(1);
+    setItemsToShow(ITEMS_PER_PAGE);
+  }, [debouncedSearchTerm, categoryFilter, manufacturerFilter, prescriptionFilter, sortOrder]);
 
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
-    if (value) params.set("search", value);
-    else params.delete("search");
-    setSearchParams(params);
-  }, [searchParams, setSearchParams]);
-
-  const handleCategoryChange = useCallback((value: string) => {
-    setSelectedCategory(value);
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
-    if (value && value !== "all") params.set("category", value);
-    else params.delete("category");
-    setSearchParams(params);
-  }, [searchParams, setSearchParams]);
-
-  const handleManufacturerChange = useCallback((value: string) => {
-    setSelectedManufacturer(value);
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
-    if (value && value !== "all") params.set("manufacturer", value);
-    else params.delete("manufacturer");
-    setSearchParams(params);
-  }, [searchParams, setSearchParams]);
-
-  const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedCategory("all");
-    setSelectedManufacturer("all");
-    setPriceRange("all");
-    setSortBy("name");
-    setSearchParams({});
-  };
-
-  /* ---------------------------- Refresh handler -------------------------- */
-  const handleRefresh = () => {
-    try {
-      localStorage.removeItem(CACHE_KEY);
-    } catch (e) {
-      // ignore
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedMedicines.length / ITEMS_PER_PAGE));
+  const paginatedMedicines = useMemo(() => {
+    if (useLoadMore) {
+      return filteredAndSortedMedicines.slice(0, itemsToShow);
     }
-    // bump token to force re-fetch effect
-    setRefreshToken(t => t + 1);
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredAndSortedMedicines.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredAndSortedMedicines, currentPage, useLoadMore, itemsToShow]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  /* ----------------------------- Render ---------------------------------- */
+  const handleLoadMore = () => {
+    setItemsToShow((s) => s + ITEMS_PER_PAGE);
+  };
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setCategoryFilter('all');
+    setManufacturerFilter('all');
+    setPrescriptionFilter(false);
+    setSortOrder('name-asc');
+    setCurrentPage(1);
+    setItemsToShow(ITEMS_PER_PAGE);
+  };
+
+  // removable filter chips
+  const activeChips = useMemo(() => {
+    const chips: { key: string; label: string; onRemove: () => void }[] = [];
+    if (searchTerm.trim()) chips.push({ key: 'q', label: `Search: "${searchTerm.trim()}"`, onRemove: () => setSearchTerm('') });
+    if (categoryFilter !== 'all') chips.push({ key: 'category', label: `Category: ${categoryFilter}`, onRemove: () => setCategoryFilter('all') });
+    if (manufacturerFilter !== 'all') chips.push({ key: 'manufacturer', label: `Manufacturer: ${manufacturerFilter}`, onRemove: () => setManufacturerFilter('all') });
+    if (prescriptionFilter) chips.push({ key: 'prescription', label: 'Prescription only', onRemove: () => setPrescriptionFilter(false) });
+    return chips;
+  }, [searchTerm, categoryFilter, manufacturerFilter, prescriptionFilter]);
+
   return (
-    <div className="min-h-screen bg-gradient-subtle">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-poppins font-bold mb-4">Medicine Catalog</h1>
-          <p className="text-muted-foreground text-lg">Browse our comprehensive collection of pharmaceutical products</p>
+    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      {/* Sticky filter bar */}
+      <div className="bg-white p-4 rounded-lg shadow-md mb-4 sticky top-16 z-40">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div className="relative col-span-1 md:col-span-2 lg:col-span-2">
+            <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search by name, generic, or brand <span className="text-xs text-slate-400 ml-1"> (press “/” to focus)</span></label>
+            <Search className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              id="search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="e.g., Paracetamol, Azithromycin..."
+              className="pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary w-full"
+              aria-label="Search medicines"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                aria-label="Clear search"
+                className="absolute right-2 top-9 p-1.5 rounded-md text-gray-500 hover:bg-gray-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700">Category</label>
+            <select
+              id="category"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full mt-1 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              aria-label="Filter by category"
+            >
+              <option value="all">All Categories</option>
+              {uniqueCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="manufacturer" className="block text-sm font-medium text-gray-700">Manufacturer</label>
+            <select
+              id="manufacturer"
+              value={manufacturerFilter}
+              onChange={(e) => setManufacturerFilter(e.target.value)}
+              className="w-full mt-1 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              aria-label="Filter by manufacturer"
+            >
+              <option value="all">All Manufacturers</option>
+              {uniqueManufacturers.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
         </div>
 
-        {/* Search & Controls */}
-        <Card className="mb-6 border-0 shadow-soft">
-          <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search medicines, brands, or generic names..."
-                    className="pl-10 bg-background border-0"
-                    value={searchQuery}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-                <SelectTrigger className="w-full lg:w-48 bg-background border-0">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.icon} {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <div className="flex bg-muted rounded-lg p-1">
-                <Button variant={viewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("grid")} className="h-8">
-                  <Grid className="h-4 w-4" />
-                </Button>
-                <Button variant={viewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("list")} className="h-8">
-                  <List className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="flex gap-2 items-center">
-                <Button variant="outline" onClick={() => setShowFilters(s => !s)} className="lg:w-auto border-primary text-primary">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filters
-                  <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showFilters ? "rotate-180" : ""}`} />
-                </Button>
-
-                <Button variant="ghost" onClick={handleRefresh} className="hidden lg:inline-flex">
-                  <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-                </Button>
-              </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="prescription"
+                checked={prescriptionFilter}
+                onChange={(e) => setPrescriptionFilter(e.target.checked)}
+                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+              />
+              <label htmlFor="prescription" className="ml-2 block text-sm text-gray-900">Prescription only</label>
             </div>
 
-            {/* Advanced Filters */}
-            {showFilters && (
-              <div className="border-t border-border mt-4 pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Select value={selectedManufacturer} onValueChange={handleManufacturerChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Manufacturers" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Manufacturers</SelectItem>
-                      {manufacturers.map(m => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <button onClick={resetFilters} className="flex items-center text-sm text-primary hover:underline" aria-label="Reset filters">
+              <X className="w-4 h-4 mr-1" /> Reset
+            </button>
 
-                  <Select value={priceRange} onValueChange={setPriceRange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Prices" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Prices</SelectItem>
-                      <SelectItem value="under-20">Under $20</SelectItem>
-                      <SelectItem value="20-50">$20 - $50</SelectItem>
-                      <SelectItem value="over-50">Over $50</SelectItem>
-                    </SelectContent>
-                  </Select>
+            
+          </div>
 
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="name">Name (A-Z)</SelectItem>
-                      <SelectItem value="price-low">Price (Low to High)</SelectItem>
-                      <SelectItem value="price-high">Price (High to Low)</SelectItem>
-                      <SelectItem value="availability">Availability</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div className="flex items-center gap-3">
+            <label htmlFor="sort" className="sr-only">Sort by</label>
+            <select
+              id="sort"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              aria-label="Sort medicines"
+            >
+              <option value="name-asc">Name (A–Z)</option>
+              <option value="name-desc">Name (Z–A)</option>
+              <option value="price-asc">Price: Low → High</option>
+              <option value="price-desc">Price: High → Low</option>
+              <option value="availability">Availability</option>
+            </select>
 
-                <div className="flex justify-between items-center mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Showing {filteredMedicines.length} of {medicines.length} medicines
-                  </p>
-                  <div className="flex gap-2 items-center">
-                    <Button variant="ghost" size="sm" onClick={clearFilters}>Clear All Filters</Button>
-                    <Button variant="ghost" size="sm" onClick={handleRefresh}><RefreshCw className="h-4 w-4 mr-2" /> Reload</Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            <div className="flex items-center space-x-2">
+              <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-primary text-white' : 'bg-white'}`} aria-label="Grid View">
+                <LayoutGrid size={18} />
+              </button>
+              <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-white'}`} aria-label="List View">
+                <List size={18} />
+              </button>
+            </div>
 
-        {/* Loading / Error / Results */}
-        {loading ? (
-          <Card className="border-0 shadow-soft">
-            <CardContent className="p-12 text-center">Loading medicines…</CardContent>
-          </Card>
-        ) : error ? (
-          <Card className="border-0 shadow-soft">
-            <CardContent className="p-6 text-center">
-              <div className="text-sm text-rose-600">{error}</div>
-            </CardContent>
-          </Card>
-        ) : filteredMedicines.length === 0 ? (
-          <Card className="border-0 shadow-soft">
-            <CardContent className="p-12 text-center">
-              <div className="space-y-4">
-                <div className="text-4xl">💊</div>
-                <h3 className="text-xl font-poppins font-semibold">No medicines found</h3>
-                <p className="text-muted-foreground">Try adjusting your search criteria or clearing filters</p>
-                <Button onClick={clearFilters} variant="outline">Clear Filters</Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "space-y-4"}>
-            {filteredMedicines.map(medicine => (
-              <MedicineCard key={medicine.id} medicine={medicine} viewMode={viewMode} />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={useLoadMore} onChange={(e) => { setUseLoadMore(e.target.checked); setItemsToShow(ITEMS_PER_PAGE); }} className="h-4 w-4" />
+              <span className="text-slate-600">Load more</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Active filter chips */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {activeChips.length === 0 ? (
+            <div className="text-sm text-slate-500">No active filters — showing everything.</div>
+          ) : (
+            activeChips.map((chip) => (
+              <button
+                key={chip.key}
+                onClick={chip.onRemove}
+                className="inline-flex items-center gap-2 text-sm bg-slate-100 px-3 py-1 rounded-full border border-slate-200"
+              >
+                <span>{chip.label}</span>
+                <X className="w-3 h-3 text-slate-500" />
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Result summary + view toggles */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-slate-600">
+          Showing <strong>{paginatedMedicines.length}</strong> of <strong>{filteredAndSortedMedicines.length}</strong> results
+          {debouncedSearchTerm ? <span className="ml-2 text-slate-400">for “{debouncedSearchTerm}”</span> : null}
+        </p>
+
+        <div className="flex items-center space-x-2">
+          <span className="text-xs text-slate-400 mr-2">View</span>
+          <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-primary text-white' : 'bg-white'}`} aria-label="Grid View">
+            <LayoutGrid size={16} />
+          </button>
+          <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-white'}`} aria-label="List View">
+            <List size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Loading / Error / Empty / Results */}
+      {loading && (
+        <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" : "space-y-4"}>
+          {Array.from({ length: Math.min(8, ITEMS_PER_PAGE / 3) }).map((_, i) => <MedicineCardSkeleton key={i} view={viewMode} />)}
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="text-center py-10 px-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
+          <h3 className="mt-2 text-lg font-medium">Error Loading Data</h3>
+          <p className="mt-1 text-sm">{String(error)}</p>
+        </div>
+      )}
+
+      {!loading && !error && paginatedMedicines.length > 0 && (
+        <>
+          <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" : "space-y-4"}>
+            {paginatedMedicines.map((med) => (
+              <MedicineCard key={med.id} medicine={med} view={viewMode} searchHighlight={debouncedSearchTerm} />
             ))}
           </div>
-        )}
-      </div>
+
+          {/* Pagination or Load more */}
+          <div className="mt-6 flex items-center justify-center">
+            {useLoadMore ? (
+              filteredAndSortedMedicines.length > itemsToShow ? (
+                <button onClick={handleLoadMore} className="inline-flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-md">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Load more
+                </button>
+              ) : (
+                <div className="text-sm text-slate-500">End of results</div>
+              )
+            ) : (
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+            )}
+          </div>
+        </>
+      )}
+
+      {!loading && !error && paginatedMedicines.length === 0 && (
+        <div className="text-center py-10">
+          <div className="mx-auto w-full max-w-md">
+            <img src="https://images.unsplash.com/photo-1526256262350-7da7584cf5eb?q=80&w=1200&auto=format&fit=crop" alt="No results" className="rounded-lg mb-4" />
+            <h3 className="text-lg font-medium mb-2">No medicines matched your filters</h3>
+            <p className="text-sm text-slate-600 mb-4">Try clearing some filters or search terms, or try broader categories (e.g., "antibiotic").</p>
+            <div className="flex items-center justify-center gap-3">
+              <button onClick={resetFilters} className="px-4 py-2 bg-primary text-white rounded-md">Clear filters</button>
+              <button onClick={() => { setSearchTerm(''); setCategoryFilter('all'); setManufacturerFilter('all'); }} className="px-4 py-2 border rounded-md">Start over</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

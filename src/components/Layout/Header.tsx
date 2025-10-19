@@ -4,6 +4,7 @@ import { Search, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import logo from "@/assets/pkpharma.jpeg";
+import banner from "@/assets/banner-bgwhite.jpeg";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -25,7 +26,7 @@ const Header = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-3">
             <img src={logo} alt="People Kind Pharma Logo" className="h-10 w-10 rounded-lg shadow-soft" />
-            <span className="font-poppins text-xl font-bold text-primary">People Kind Pharma</span>
+            <img src={banner} alt="People Kind Pharma" height={32} className="h-8 object-contain"/>
           </Link>
 
           {/* Desktop Navigation */}

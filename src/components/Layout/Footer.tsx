@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Phone, Mail, MapPin, Clock } from "lucide-react";
 import logo from "@/assets/pkpharma.jpeg";
+import banner from "@/assets/banner-bgwhite.jpeg";
 
 const Footer = () => {
   return (
@@ -12,7 +13,7 @@ const Footer = () => {
           <div className="space-y-4">
             <Link to="/" className="flex items-center space-x-3">
               <img src={logo} alt="People Kind Pharma Logo" className="h-8 w-8 rounded-lg" />
-              <span className="font-poppins text-lg font-bold text-primary">People Kind Pharma</span>
+              <img src={banner} alt="People Kind Pharma" height={32} className="h-8 object-contain"/>
             </Link>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Your trusted pharmaceutical dealer providing quality medicines and healthcare products with professional service and competitive prices.
@@ -77,7 +78,8 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-border mt-8 pt-6 text-center">
           <p className="text-muted-foreground text-sm">
-            © 2024 People Kind Pharma. All rights reserved. | Licensed Pharmaceutical Dealer
+            © 2025 People Kind Pharma. All rights reserved. | Licensed Pharmaceutical Dealer | Powered by 
+            <a href="https://www.ascendons.in/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline"> Ascendons</a>
           </p>
         </div>
       </div>

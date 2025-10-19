@@ -4,12 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { mockMedicines, categories } from "@/data/medicines";
+import { categories } from "@/data/medicines";
 import medicineImage from "@/assets/medicine-generic.jpg";
+
+const [medicines, setMedicines] = (() => {
+  const medicines = JSON.parse(localStorage.getItem('medicines') || '[]');
+  return medicines;
+})();
 
 const MedicineDetailPage = () => {
   const { id } = useParams();
-  const medicine = mockMedicines.find(m => m.id === id);
+  const medicine = medicines.find(m => m.id === id);
 
   if (!medicine) {
     return (
