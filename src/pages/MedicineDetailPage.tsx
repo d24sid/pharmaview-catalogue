@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -56,10 +56,23 @@ const MedicineDetailPage: React.FC = () => {
       const url = `https://docs.google.com/spreadsheets/d/1ZDO0G2YTgxcXrK-Zw4sBofPXtcdsvirrSs4fKdnZIQI/gviz/tq?tqx=out:json&gid=0`;
   
       try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const cacheTime = parsed.timestamp;
+          const now = new Date().getTime();
+          const ageMinutes = (now - cacheTime) / (1000 * 60);
+          if (ageMinutes < 60) {
+            setMedicines(parsed.data);
+            return;
+          }
+        }
+        else{
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Network response was not ok: ${response.statusText}`);
         }
+        
         const text = await response.text();
         const gvizResponse = parseGvizText(text);
         const rows = gvizResponseToRows(gvizResponse);
@@ -72,14 +85,18 @@ const MedicineDetailPage: React.FC = () => {
           timestamp: now.getTime(),
           data: mappedMedicines,
         }));
+      }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
         console.error("Failed to fetch or process medicines data:", err);
       } 
     }, []);
 
+    useEffect(() => {
+      fetchAndProcessData();
+    }, []);
   const medicine: Medicine | undefined = medicines.find((m: Medicine) => m.id === id);
-
+  
   const images = useMemo(() => {
     if (!medicine) return [];
     const list: string[] = [];

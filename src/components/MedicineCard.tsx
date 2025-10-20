@@ -77,7 +77,7 @@ const MedicineCard: React.FC<MedicineCardProps> = ({
   const imageSrc = !imgError && medicine.imageUrl ? medicine.imageUrl : fallbackImageUrl;
 
   // Accessibility labels
-  const detailUrl = `medicine/${medicine.id}`;
+  const detailUrl = `${medicine.id}`;
 
   const handleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
