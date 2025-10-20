@@ -25,28 +25,52 @@ const Header = () => {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-3">
-            <img src={logo} alt="People Kind Pharma Logo" className="h-10 w-10 rounded-lg shadow-soft" />
-            <img src={banner} alt="People Kind Pharma" height={32} className="h-8 object-contain"/>
+            <img
+              src={logo}
+              alt="People Kind Pharma Logo"
+              className="h-10 w-10 rounded-lg shadow-soft"
+            />
+            <img
+              src={banner}
+              alt="People Kind Pharma"
+              height={32}
+              className="h-8 object-contain"
+            />
           </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-muted-foreground hover:text-primary transition-smooth font-medium">
+            <Link
+              to="/"
+              className="text-muted-foreground hover:text-primary transition-smooth font-medium"
+            >
               Home
             </Link>
-            <Link to="/medicines" className="text-muted-foreground hover:text-primary transition-smooth font-medium">
+            <Link
+              to="/medicines"
+              className="text-muted-foreground hover:text-primary transition-smooth font-medium"
+            >
               Medicines
             </Link>
-            <Link to="/about" className="text-muted-foreground hover:text-primary transition-smooth font-medium">
+            <Link
+              to="/about"
+              className="text-muted-foreground hover:text-primary transition-smooth font-medium"
+            >
               About
             </Link>
-            <Link to="/contact" className="text-muted-foreground hover:text-primary transition-smooth font-medium">
+            <Link
+              to="/contact"
+              className="text-muted-foreground hover:text-primary transition-smooth font-medium"
+            >
               Contact
             </Link>
           </nav>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="hidden sm:flex items-center space-x-2">
+          <form
+            onSubmit={handleSearch}
+            className="hidden sm:flex items-center space-x-2"
+          >
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -57,7 +81,11 @@ const Header = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button type="submit" size="sm" className="bg-primary hover:bg-primary/90">
+            <Button
+              type="submit"
+              size="sm"
+              className="bg-primary hover:bg-primary/90"
+            >
               Search
             </Button>
           </form>
@@ -69,7 +97,11 @@ const Header = () => {
             className="md:hidden"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {isMenuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </Button>
         </div>
 
@@ -77,37 +109,40 @@ const Header = () => {
         {isMenuOpen && (
           <div className="md:hidden border-t bg-background py-4">
             <nav className="flex flex-col space-y-4">
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className="text-muted-foreground hover:text-primary transition-smooth font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Home
               </Link>
-              <Link 
-                to="/medicines" 
+              <Link
+                to="/medicines"
                 className="text-muted-foreground hover:text-primary transition-smooth font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Medicines
               </Link>
-              <Link 
-                to="/about" 
+              <Link
+                to="/about"
                 className="text-muted-foreground hover:text-primary transition-smooth font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
                 About
               </Link>
-              <Link 
-                to="/contact" 
+              <Link
+                to="/contact"
                 className="text-muted-foreground hover:text-primary transition-smooth font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Contact
               </Link>
-              
+
               {/* Mobile Search */}
-              <form onSubmit={handleSearch} className="flex items-center space-x-2 pt-2">
+              <form
+                onSubmit={handleSearch}
+                className="flex items-center space-x-2 pt-2"
+              >
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -118,7 +153,11 @@ const Header = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button type="submit" size="sm" className="bg-primary hover:bg-primary/90">
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90"
+                >
                   Search
                 </Button>
               </form>

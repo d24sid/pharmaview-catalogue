@@ -1,5 +1,5 @@
 /* Pharma Healthcare Design System - Professional & Trustworthy */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap");
 
 /* stylelint-disable at-rule-no-unknown */
 @tailwind base;
@@ -46,16 +46,34 @@
     --ring: 208 100% 47%;
 
     /* Healthcare gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
-    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--muted)) 0%, hsl(var(--background)) 100%);
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(var(--primary)),
+      hsl(var(--primary-glow))
+    );
+    --gradient-secondary: linear-gradient(
+      135deg,
+      hsl(var(--secondary)),
+      hsl(var(--secondary-light))
+    );
+    --gradient-hero: linear-gradient(
+      135deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--secondary)) 100%
+    );
+    --gradient-subtle: linear-gradient(
+      180deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--background)) 100%
+    );
 
     /* Professional shadows */
     --shadow-soft: 0 2px 8px -2px hsl(var(--primary) / 0.1);
     --shadow-medium: 0 4px 20px -4px hsl(var(--primary) / 0.15);
     --shadow-strong: 0 8px 30px -6px hsl(var(--primary) / 0.2);
-    --shadow-glow: 0 0 0 1px hsl(var(--primary) / 0.1), 0 4px 16px -4px hsl(var(--primary) / 0.3);
+    --shadow-glow:
+      0 0 0 1px hsl(var(--primary) / 0.1),
+      0 4px 16px -4px hsl(var(--primary) / 0.3);
 
     /* Smooth transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -128,7 +146,12 @@
     @apply bg-background text-foreground font-inter;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-poppins font-semibold tracking-tight;
   }
 }
@@ -137,39 +160,39 @@
   .gradient-primary {
     background: var(--gradient-primary);
   }
-  
+
   .gradient-secondary {
     background: var(--gradient-secondary);
   }
-  
+
   .gradient-hero {
     background: var(--gradient-hero);
   }
-  
+
   .gradient-subtle {
     background: var(--gradient-subtle);
   }
-  
+
   .shadow-soft {
     box-shadow: var(--shadow-soft);
   }
-  
+
   .shadow-medium {
     box-shadow: var(--shadow-medium);
   }
-  
+
   .shadow-strong {
     box-shadow: var(--shadow-strong);
   }
-  
+
   .shadow-glow {
     box-shadow: var(--shadow-glow);
   }
-  
+
   .transition-smooth {
     transition: var(--transition-smooth);
   }
-  
+
   .transition-bounce {
     transition: var(--transition-bounce);
   }

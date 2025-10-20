@@ -1,5 +1,5 @@
 // types.ts
-export type Availability = 'In Stock' | 'Low Stock' | 'Out of Stock';
+export type Availability = "In Stock" | "Low Stock" | "Out of Stock";
 
 export interface Medicine {
   id: string;
@@ -28,17 +28,17 @@ export interface Medicine {
  * categories: kept as runtime data (for UI) and typed as well
  */
 export const categories = [
-  { id: 'antibiotics', name: 'Antibiotics', icon: '💊' },
-  { id: 'painkillers', name: 'Pain Relief', icon: '🩹' },
-  { id: 'vitamins', name: 'Vitamins & Supplements', icon: '🌟' },
-  { id: 'cardiac', name: 'Cardiac Care', icon: '❤️' },
-  { id: 'respiratory', name: 'Respiratory', icon: '🫁' },
-  { id: 'diabetes', name: 'Diabetes Care', icon: '🩺' },
-  { id: 'digestive', name: 'Digestive Health', icon: '🥗' },
-  { id: 'skincare', name: 'Dermatology', icon: '🧴' },
+  { id: "antibiotics", name: "Antibiotics", icon: "💊" },
+  { id: "painkillers", name: "Pain Relief", icon: "🩹" },
+  { id: "vitamins", name: "Vitamins & Supplements", icon: "🌟" },
+  { id: "cardiac", name: "Cardiac Care", icon: "❤️" },
+  { id: "respiratory", name: "Respiratory", icon: "🫁" },
+  { id: "diabetes", name: "Diabetes Care", icon: "🩺" },
+  { id: "digestive", name: "Digestive Health", icon: "🥗" },
+  { id: "skincare", name: "Dermatology", icon: "🧴" },
 ] as const;
 
-export type CategoryId = typeof categories[number]['id'];
+export type CategoryId = (typeof categories)[number]["id"];
 
 /* ---------------------------
  * Sheet row conversion helpers
@@ -54,12 +54,12 @@ export type CategoryId = typeof categories[number]['id'];
 export function fromSheetRow(row: Record<string, any>): Medicine {
   // normalize any header/value: keep only alphanumeric, lowercase
   const normalize = (s: any) =>
-    String(s ?? '')
-      .replace(/[^a-z0-9]/gi, '') // remove everything except letters and digits
+    String(s ?? "")
+      .replace(/[^a-z0-9]/gi, "") // remove everything except letters and digits
       .toLowerCase();
 
   const getKey = (wanted: string[]) => {
-    const normalizedWanted = wanted.map(w => normalize(w));
+    const normalizedWanted = wanted.map((w) => normalize(w));
     const keys = Object.keys(row || {});
     for (const k of keys) {
       const nk = normalize(k);
@@ -70,57 +70,93 @@ export function fromSheetRow(row: Record<string, any>): Medicine {
 
   const get = (...candidates: string[]) => {
     const k = getKey(candidates);
-    if (!k) return '';
+    if (!k) return "";
     const v = row[k];
-    return v === null || v === undefined ? '' : String(v).trim();
+    return v === null || v === undefined ? "" : String(v).trim();
   };
 
   const parseNumber = (val: any, fallback = 0) => {
-    if (typeof val === 'number') return val;
-    const s = String(val || '').replace(/[^\d.-]/g, '');
+    if (typeof val === "number") return val;
+    const s = String(val || "").replace(/[^\d.-]/g, "");
     const n = parseFloat(s);
     return Number.isFinite(n) ? n : fallback;
   };
 
   const splitList = (val: any): string[] => {
     if (!val) return [];
-    if (Array.isArray(val)) return val.map(v => String(v).trim()).filter(Boolean);
+    if (Array.isArray(val))
+      return val.map((v) => String(v).trim()).filter(Boolean);
     return String(val)
-      .split(',')
-      .map(s => s.trim())
+      .split(",")
+      .map((s) => s.trim())
       .filter(Boolean);
   };
 
   // --- Core field mapping ---
-  const name = get('name', 'medicine name', 'drug', 'product name', 'productname', 'Product Name') || '';
-  const genericName = get('genericname', 'generic name', 'generic') || '';
-  const brand = get('brand', 'company', 'marketer') || '';
-  const category = get('category', 'therapeutic category') || 'Uncategorized';
-  const manufacturer = get('manufacturer', 'maker') || '';
-  const description = get('description', 'details', 'notes') || '';
-  const dosage = get('dosage', 'strength') || '';
-  const form = get('form', 'dosage form', 'type') || '';
+  const name =
+    get(
+      "name",
+      "medicine name",
+      "drug",
+      "product name",
+      "productname",
+      "Product Name",
+    ) || "";
+  const genericName = get("genericname", "generic name", "generic") || "";
+  const brand = get("brand", "company", "marketer") || "";
+  const category = get("category", "therapeutic category") || "Uncategorized";
+  const manufacturer = get("manufacturer", "maker") || "";
+  const description = get("description", "details", "notes") || "";
+  const dosage = get("dosage", "strength") || "";
+  const form = get("form", "dosage form", "type") || "";
 
-  const price = parseNumber(get('price', 'cost', 'mrp'), 0);
-  const stock = Math.max(0, parseInt(String(parseNumber(get('stock', 'quantity', 'available') || 0)), 10) || 0);
+  const price = parseNumber(get("price", "cost", "mrp"), 0);
+  const stock = Math.max(
+    0,
+    parseInt(
+      String(parseNumber(get("stock", "quantity", "available") || 0)),
+      10,
+    ) || 0,
+  );
 
-  const availabilityRaw = (get('availability', 'status', 'stock status') || '').toLowerCase();
-  let availability: Availability = 'In Stock';
-  if (availabilityRaw.includes('low')) availability = 'Low Stock';
-  else if (availabilityRaw.includes('out')) availability = 'Out of Stock';
+  const availabilityRaw = (
+    get("availability", "status", "stock status") || ""
+  ).toLowerCase();
+  let availability: Availability = "In Stock";
+  if (availabilityRaw.includes("low")) availability = "Low Stock";
+  else if (availabilityRaw.includes("out")) availability = "Out of Stock";
 
-  const presRaw = (get('prescription', 'rx required', 'requires prescription', 'rx') || '').toLowerCase();
-  const prescription = presRaw === '1' || presRaw === 'true' || presRaw === 'yes' || presRaw === 'y';
+  const presRaw = (
+    get("prescription", "rx required", "requires prescription", "rx") || ""
+  ).toLowerCase();
+  const prescription =
+    presRaw === "1" ||
+    presRaw === "true" ||
+    presRaw === "yes" ||
+    presRaw === "y";
 
-  const imageUrl = (get('imageurl', 'image', 'photo', 'img') || '').trim() || undefined;
+  const imageUrl =
+    (get("imageurl", "image", "photo", "img") || "").trim() || undefined;
 
-  const uses = splitList(get('uses', 'indications'));
-  const sideEffects = splitList(get('sideeffects', 'side effects', 'adverse effects'));
-  const contraindications = splitList(get('contraindications', 'contra indications', 'contraindication', 'contraindications', 'contrainDications'));
+  const uses = splitList(get("uses", "indications"));
+  const sideEffects = splitList(
+    get("sideeffects", "side effects", "adverse effects"),
+  );
+  const contraindications = splitList(
+    get(
+      "contraindications",
+      "contra indications",
+      "contraindication",
+      "contraindications",
+      "contrainDications",
+    ),
+  );
 
   // Compose id: use explicit id column if present, otherwise stable fallback
-  const idFromSheet = (get('id', 'uid', 'code') || '').trim();
-  const id = idFromSheet || `${name.replace(/\s+/g, '-').toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`;
+  const idFromSheet = (get("id", "uid", "code") || "").trim();
+  const id =
+    idFromSheet ||
+    `${name.replace(/\s+/g, "-").toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`;
 
   // Keep original row so nothing is lost
   const raw = { ...row };
@@ -183,7 +219,7 @@ export function gvizResponseToRows(gvizResponse: any): Record<string, any>[] {
       const cell = cells[i];
 
       if (!cell) {
-        rowObj[header] = '';
+        rowObj[header] = "";
         continue;
       }
 
@@ -192,7 +228,7 @@ export function gvizResponseToRows(gvizResponse: any): Record<string, any>[] {
         rowObj[header] = cell.f;
       } else {
         // If v is null/undefined, treat as empty string
-        if (cell.v === null || cell.v === undefined) rowObj[header] = '';
+        if (cell.v === null || cell.v === undefined) rowObj[header] = "";
         else rowObj[header] = cell.v;
       }
     }
@@ -208,6 +244,5 @@ export function gvizResponseToRows(gvizResponse: any): Record<string, any>[] {
  */
 export function medicinesFromGviz(gvizResponse: any): Medicine[] {
   const plainRows = gvizResponseToRows(gvizResponse);
-  return plainRows.map(r => fromSheetRow(r));
+  return plainRows.map((r) => fromSheetRow(r));
 }
-

@@ -1,5 +1,4 @@
-
-import type { GvizResponse } from './types';
+import type { GvizResponse } from "./types";
 
 /**
  * Parses the JSONP text from a Google Sheets GViz API response.
@@ -9,14 +8,14 @@ import type { GvizResponse } from './types';
  */
 export const parseGvizText = (text: string): GvizResponse => {
   const jsonText = text
-    .replace('/*O_o*/', '')
-    .replace('google.visualization.Query.setResponse(', '')
+    .replace("/*O_o*/", "")
+    .replace("google.visualization.Query.setResponse(", "")
     .slice(0, -2);
   try {
     return JSON.parse(jsonText);
   } catch (e) {
-    console.error('Failed to parse GViz response:', e);
-    throw new Error('Invalid GViz response format.');
+    console.error("Failed to parse GViz response:", e);
+    throw new Error("Invalid GViz response format.");
   }
 };
 
@@ -26,15 +25,17 @@ export const parseGvizText = (text: string): GvizResponse => {
  * @param gvizResponse The parsed GViz response object.
  * @returns An array of objects, where each object represents a row.
  */
-export const gvizResponseToRows = (gvizResponse: GvizResponse): Record<string, any>[] => {
-  if (gvizResponse.status !== 'ok' || !gvizResponse.table) {
-    throw new Error('GViz response indicates an error or contains no table.');
+export const gvizResponseToRows = (
+  gvizResponse: GvizResponse,
+): Record<string, any>[] => {
+  if (gvizResponse.status !== "ok" || !gvizResponse.table) {
+    throw new Error("GViz response indicates an error or contains no table.");
   }
 
   const { cols, rows } = gvizResponse.table;
-  const headers = cols.map(col => col.label || col.id).filter(Boolean);
+  const headers = cols.map((col) => col.label || col.id).filter(Boolean);
 
-  return rows.map(row => {
+  return rows.map((row) => {
     const rowObject: Record<string, any> = {};
     row.c.forEach((cell, index) => {
       const header = headers[index];

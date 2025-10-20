@@ -1,4 +1,3 @@
-
 export type Availability = "In Stock" | "Low Stock" | "Out of Stock";
 
 export interface Medicine {
@@ -23,29 +22,29 @@ export interface Medicine {
 }
 
 export interface GvizCol {
-    id: string;
-    label: string;
-    type: string;
+  id: string;
+  label: string;
+  type: string;
 }
 
 export interface GvizCell {
-    v?: any;
-    f?: string;
+  v?: any;
+  f?: string;
 }
 
 export interface GvizRow {
-    c: (GvizCell | null)[];
+  c: (GvizCell | null)[];
 }
 
 export interface GvizTable {
-    cols: GvizCol[];
-    rows: GvizRow[];
+  cols: GvizCol[];
+  rows: GvizRow[];
 }
 
 export interface GvizResponse {
-    version: string;
-    reqId: string;
-    status: string;
-    sig: string;
-    table: GvizTable;
+  version: string;
+  reqId: string;
+  status: string;
+  sig: string;
+  table: GvizTable;
 }

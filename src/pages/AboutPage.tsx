@@ -9,23 +9,24 @@ const AboutPage = () => {
     {
       icon: Shield,
       title: "Trusted & Certified",
-      description: "All our medicines are sourced from licensed manufacturers."
+      description: "All our medicines are sourced from licensed manufacturers.",
     },
     {
       icon: Truck,
       title: "Nationwide Delivery",
-      description: "Reliable supply chain and timely delivery to your doorstep."
+      description:
+        "Reliable supply chain and timely delivery to your doorstep.",
     },
     {
       icon: Clock,
       title: "24/7 Support",
-      description: "Our experts are available round-the-clock for your needs."
+      description: "Our experts are available round-the-clock for your needs.",
     },
     {
       icon: Star,
       title: "Quality Guaranteed",
-      description: "Every product undergoes rigorous quality checks."
-    }
+      description: "Every product undergoes rigorous quality checks.",
+    },
   ];
 
   return (
@@ -39,11 +40,11 @@ const AboutPage = () => {
               About <span className="text-primary">People Kind Pharma</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl">
-              We are a leading pharmaceutical distributor committed to 
-              delivering quality medicines and healthcare products to 
-              hospitals, clinics, and pharmacies across the nation. 
-              With years of experience, we have built a reputation for 
-              reliability, affordability, and trust.
+              We are a leading pharmaceutical distributor committed to
+              delivering quality medicines and healthcare products to hospitals,
+              clinics, and pharmacies across the nation. With years of
+              experience, we have built a reputation for reliability,
+              affordability, and trust.
             </p>
           </div>
 
@@ -64,16 +65,16 @@ const AboutPage = () => {
           <div className="space-y-4">
             <h2 className="text-3xl font-poppins font-bold">Our Mission</h2>
             <p className="text-muted-foreground text-lg leading-relaxed">
-              To make essential medicines accessible and affordable to all, 
+              To make essential medicines accessible and affordable to all,
               while ensuring uncompromised quality and customer service.
             </p>
           </div>
           <div className="space-y-4">
             <h2 className="text-3xl font-poppins font-bold">Our Vision</h2>
             <p className="text-muted-foreground text-lg leading-relaxed">
-              To be the most trusted pharmaceutical partner for healthcare 
-              providers by revolutionizing the supply chain with technology 
-              and transparency.
+              To be the most trusted pharmaceutical partner for healthcare
+              providers by revolutionizing the supply chain with technology and
+              transparency.
             </p>
           </div>
         </div>
@@ -87,8 +88,8 @@ const AboutPage = () => {
               Why Choose Us?
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              We go beyond being just a distributor — we’re your trusted 
-              partner in healthcare.
+              We go beyond being just a distributor — we’re your trusted partner
+              in healthcare.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

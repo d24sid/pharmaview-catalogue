@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
   Pill,
@@ -10,10 +10,10 @@ import {
   Copy,
   Tag,
   Star,
-} from 'lucide-react';
-import { gvizResponseToRows } from '@/data/medicines';
-import { mapRowsToMedicines } from '@/services/dataMapping';
-import { parseGvizText } from '@/services/gvizService';
+} from "lucide-react";
+import { gvizResponseToRows } from "@/data/medicines";
+import { mapRowsToMedicines } from "@/services/dataMapping";
+import { parseGvizText } from "@/services/gvizService";
 
 type Medicine = {
   id: string;
@@ -38,65 +38,77 @@ type Medicine = {
   // raw removed / ignored
 };
 
-const fallbackImage = (name = 'Medicine') =>
-  `https://placehold.co/1200x1200/0D9488/FFFFFF?text=${encodeURIComponent(name.charAt(0) || 'M')}`;
+const fallbackImage = (name = "Medicine") =>
+  `https://placehold.co/1200x1200/0D9488/FFFFFF?text=${encodeURIComponent(name.charAt(0) || "M")}`;
 
 const currency = (n: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n);
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(n);
 
 const MedicineDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [medicines, setMedicines] = useState<Medicine[]>([]);
-  const [activeTab, setActiveTab] = useState<'description' | 'uses' | 'sideEffects' | 'contraindications'>('description');
+  const [activeTab, setActiveTab] = useState<
+    "description" | "uses" | "sideEffects" | "contraindications"
+  >("description");
   const [selectedImage, setSelectedImage] = useState<number>(0);
   const [copying, setCopying] = useState(false);
-  const CACHE_KEY = 'pharma_medicines_cache';
-    const fetchAndProcessData = useCallback(async () => {
-  
-      const url = `https://docs.google.com/spreadsheets/d/1ZDO0G2YTgxcXrK-Zw4sBofPXtcdsvirrSs4fKdnZIQI/gviz/tq?tqx=out:json&gid=0`;
-  
-      try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          const cacheTime = parsed.timestamp;
-          const now = new Date().getTime();
-          const ageMinutes = (now - cacheTime) / (1000 * 60);
-          if (ageMinutes < 60) {
-            setMedicines(parsed.data);
-            return;
-          }
+  const CACHE_KEY = "pharma_medicines_cache";
+  const fetchAndProcessData = useCallback(async () => {
+    const url = `https://docs.google.com/spreadsheets/d/1ZDO0G2YTgxcXrK-Zw4sBofPXtcdsvirrSs4fKdnZIQI/gviz/tq?tqx=out:json&gid=0`;
+
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const cacheTime = parsed.timestamp;
+        const now = new Date().getTime();
+        const ageMinutes = (now - cacheTime) / (1000 * 60);
+        if (ageMinutes < 60) {
+          setMedicines(parsed.data);
+          return;
         }
-        else{
+      } else {
         const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`Network response was not ok: ${response.statusText}`);
+          throw new Error(
+            `Network response was not ok: ${response.statusText}`,
+          );
         }
-        
+
         const text = await response.text();
         const gvizResponse = parseGvizText(text);
         const rows = gvizResponseToRows(gvizResponse);
         const mappedMedicines = mapRowsToMedicines(rows);
-  
+
         const now = new Date();
         setMedicines(mappedMedicines);
-  
-        localStorage.setItem(CACHE_KEY, JSON.stringify({
-          timestamp: now.getTime(),
-          data: mappedMedicines,
-        }));
-      }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-        console.error("Failed to fetch or process medicines data:", err);
-      } 
-    }, []);
 
-    useEffect(() => {
-      fetchAndProcessData();
-    }, []);
-  const medicine: Medicine | undefined = medicines.find((m: Medicine) => m.id === id);
-  
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            timestamp: now.getTime(),
+            data: mappedMedicines,
+          }),
+        );
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "An unknown error occurred";
+      console.error("Failed to fetch or process medicines data:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAndProcessData();
+  }, []);
+  const medicine: Medicine | undefined = medicines.find(
+    (m: Medicine) => m.id === id,
+  );
+
   const images = useMemo(() => {
     if (!medicine) return [];
     const list: string[] = [];
@@ -128,10 +140,10 @@ const MedicineDetailPage: React.FC = () => {
       await navigator.clipboard.writeText(url);
       setTimeout(() => setCopying(false), 700);
       // subtle feedback — replace with toast in future if desired
-      alert('Link copied to clipboard');
+      alert("Link copied to clipboard");
     } catch {
       setCopying(false);
-      alert('Copy failed — please copy manually');
+      alert("Copy failed — please copy manually");
     }
   };
 
@@ -154,7 +166,10 @@ const MedicineDetailPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <Link to="/medicines" className="inline-flex items-center mb-6 text-primary hover:underline">
+      <Link
+        to="/medicines"
+        className="inline-flex items-center mb-6 text-primary hover:underline"
+      >
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back to Catalog
       </Link>
@@ -170,13 +185,17 @@ const MedicineDetailPage: React.FC = () => {
                 className="w-full h-full object-cover"
                 loading="lazy"
                 onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = fallbackImage(medicine.name);
+                  (e.currentTarget as HTMLImageElement).src = fallbackImage(
+                    medicine.name,
+                  );
                 }}
               />
               {/* rating pill */}
               <div className="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/90 text-slate-900 px-3 py-1 rounded-full text-sm shadow">
                 <Star className="w-4 h-4 text-yellow-500" />
-                <span className="font-medium">{(medicine.rating ?? 4.6).toFixed(1)}</span>
+                <span className="font-medium">
+                  {(medicine.rating ?? 4.6).toFixed(1)}
+                </span>
               </div>
 
               {/* prescription badge */}
@@ -195,11 +214,18 @@ const MedicineDetailPage: React.FC = () => {
                   key={idx}
                   onClick={() => setSelectedImage(idx)}
                   className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 ${
-                    idx === selectedImage ? 'border-primary' : 'border-transparent'
+                    idx === selectedImage
+                      ? "border-primary"
+                      : "border-transparent"
                   } focus:outline-none`}
                   aria-current={idx === selectedImage}
                 >
-                  <img src={src} alt={`${medicine.name} thumb ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                  <img
+                    src={src}
+                    alt={`${medicine.name} thumb ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 </button>
               ))}
             </div>
@@ -207,8 +233,12 @@ const MedicineDetailPage: React.FC = () => {
 
           {/* small product meta */}
           <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100">
-            <p className="text-sm text-subtle uppercase font-semibold">{medicine.brand}</p>
-            <h1 className="text-2xl md:text-3xl font-bold text-text mb-1">{medicine.name}</h1>
+            <p className="text-sm text-subtle uppercase font-semibold">
+              {medicine.brand}
+            </p>
+            <h1 className="text-2xl md:text-3xl font-bold text-text mb-1">
+              {medicine.name}
+            </h1>
             <p className="text-sm text-subtle">{medicine.genericName}</p>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -217,11 +247,13 @@ const MedicineDetailPage: React.FC = () => {
                   <Tag className="w-4 h-4" /> {medicine.dosage}
                 </span>
               )}
-              <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${inStock ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                {inStock ? `${medicine.stock} in stock` : 'Out of stock'}
+              <span
+                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${inStock ? "bg-emerald-50 text-emerald-800 border border-emerald-100" : "bg-red-50 text-red-700 border border-red-100"}`}
+              >
+                {inStock ? `${medicine.stock} in stock` : "Out of stock"}
               </span>
               <span className="inline-flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-full text-sm border border-slate-100">
-                {medicine.form ?? 'Form unknown'}
+                {medicine.form ?? "Form unknown"}
               </span>
             </div>
           </div>
@@ -232,19 +264,33 @@ const MedicineDetailPage: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100 mb-6">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
               <div>
-                <h2 className="text-3xl font-extrabold mb-1">{medicine.name}</h2>
-                <p className="text-sm text-subtle mb-3">{medicine.genericName} • {medicine.manufacturer}</p>
+                <h2 className="text-3xl font-extrabold mb-1">
+                  {medicine.name}
+                </h2>
+                <p className="text-sm text-subtle mb-3">
+                  {medicine.genericName} • {medicine.manufacturer}
+                </p>
 
                 <div className="flex items-baseline gap-3">
                   <div className="flex items-end gap-3">
-                    <span className="text-4xl font-extrabold text-primary">{currency(effectivePrice)}</span>
+                    <span className="text-4xl font-extrabold text-primary">
+                      {currency(effectivePrice)}
+                    </span>
                     {hasDiscount && (
-                      <span className="text-sm line-through text-subtle">{currency(medicine.mrp!)}</span>
+                      <span className="text-sm line-through text-subtle">
+                        {currency(medicine.mrp!)}
+                      </span>
                     )}
                   </div>
 
                   <div className="ml-3 text-sm text-subtle">
-                    {medicine.gst ? <span>GST: {medicine.gst}%</span> : <span className="text-subtle">GST info not available</span>}
+                    {medicine.gst ? (
+                      <span>GST: {medicine.gst}%</span>
+                    ) : (
+                      <span className="text-subtle">
+                        GST info not available
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -269,7 +315,8 @@ const MedicineDetailPage: React.FC = () => {
             </div>
 
             <div className="mt-6 text-sm text-subtle">
-              <strong>Category:</strong> {medicine.category ?? '—'} • <strong>Form:</strong> {medicine.form ?? '—'}
+              <strong>Category:</strong> {medicine.category ?? "—"} •{" "}
+              <strong>Form:</strong> {medicine.form ?? "—"}
             </div>
           </div>
 
@@ -277,15 +324,45 @@ const MedicineDetailPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-slate-100">
             <div className="border-b px-4">
               <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                <TabButton id="description" label="Description" Icon={Info} active={activeTab === 'description'} onClick={() => setActiveTab('description')} />
-                <TabButton id="uses" label="Uses" Icon={Activity} active={activeTab === 'uses'} onClick={() => setActiveTab('uses')} />
-                <TabButton id="sideEffects" label="Side Effects" Icon={AlertTriangle} active={activeTab === 'sideEffects'} onClick={() => setActiveTab('sideEffects')} />
-                <TabButton id="contraindications" label="Contraindications" Icon={AlertTriangle} active={activeTab === 'contraindications'} onClick={() => setActiveTab('contraindications')} />
+                <TabButton
+                  id="description"
+                  label="Description"
+                  Icon={Info}
+                  active={activeTab === "description"}
+                  onClick={() => setActiveTab("description")}
+                />
+                <TabButton
+                  id="uses"
+                  label="Uses"
+                  Icon={Activity}
+                  active={activeTab === "uses"}
+                  onClick={() => setActiveTab("uses")}
+                />
+                <TabButton
+                  id="sideEffects"
+                  label="Side Effects"
+                  Icon={AlertTriangle}
+                  active={activeTab === "sideEffects"}
+                  onClick={() => setActiveTab("sideEffects")}
+                />
+                <TabButton
+                  id="contraindications"
+                  label="Contraindications"
+                  Icon={AlertTriangle}
+                  active={activeTab === "contraindications"}
+                  onClick={() => setActiveTab("contraindications")}
+                />
                 <div className="ml-auto flex gap-2">
-                  <button onClick={handleShare} className="inline-flex items-center gap-2 py-3 px-2 text-sm border-l border-transparent hover:text-gray-700">
+                  <button
+                    onClick={handleShare}
+                    className="inline-flex items-center gap-2 py-3 px-2 text-sm border-l border-transparent hover:text-gray-700"
+                  >
                     <Share2 className="w-4 h-4" /> Share
                   </button>
-                  <button onClick={handleCopyLink} className="inline-flex items-center gap-2 py-3 px-2 text-sm">
+                  <button
+                    onClick={handleCopyLink}
+                    className="inline-flex items-center gap-2 py-3 px-2 text-sm"
+                  >
                     <Copy className="w-4 h-4" /> Copy
                   </button>
                 </div>
@@ -293,44 +370,58 @@ const MedicineDetailPage: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-4 min-h-[160px]">
-              {activeTab === 'description' && (
+              {activeTab === "description" && (
                 <div>
-                  <p className="text-sm leading-relaxed text-slate-700">{medicine.description ?? 'No description available.'}</p>
+                  <p className="text-sm leading-relaxed text-slate-700">
+                    {medicine.description ?? "No description available."}
+                  </p>
                 </div>
               )}
 
-              {activeTab === 'uses' && (
+              {activeTab === "uses" && (
                 <div>
                   {Array.isArray(medicine.uses) ? (
                     <ul className="list-disc list-inside space-y-2">
-                      {medicine.uses.map((u: string, i: number) => <li key={i}>{u}</li>)}
+                      {medicine.uses.map((u: string, i: number) => (
+                        <li key={i}>{u}</li>
+                      ))}
                     </ul>
                   ) : (
-                    <p className="text-sm">{medicine.uses ?? 'No data.'}</p>
+                    <p className="text-sm">{medicine.uses ?? "No data."}</p>
                   )}
                 </div>
               )}
 
-              {activeTab === 'sideEffects' && (
+              {activeTab === "sideEffects" && (
                 <div>
                   {Array.isArray(medicine.sideEffects) ? (
                     <ul className="list-disc list-inside space-y-2">
-                      {medicine.sideEffects.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                      {medicine.sideEffects.map((s: string, i: number) => (
+                        <li key={i}>{s}</li>
+                      ))}
                     </ul>
                   ) : (
-                    <p className="text-sm">{medicine.sideEffects ?? 'No data.'}</p>
+                    <p className="text-sm">
+                      {medicine.sideEffects ?? "No data."}
+                    </p>
                   )}
                 </div>
               )}
 
-              {activeTab === 'contraindications' && (
+              {activeTab === "contraindications" && (
                 <div>
                   {Array.isArray(medicine.contraindications) ? (
                     <ul className="list-disc list-inside space-y-2">
-                      {medicine.contraindications.map((c: string, i: number) => <li key={i}>{c}</li>)}
+                      {medicine.contraindications.map(
+                        (c: string, i: number) => (
+                          <li key={i}>{c}</li>
+                        ),
+                      )}
                     </ul>
                   ) : (
-                    <p className="text-sm">{medicine.contraindications ?? 'No data.'}</p>
+                    <p className="text-sm">
+                      {medicine.contraindications ?? "No data."}
+                    </p>
                   )}
                 </div>
               )}
@@ -341,15 +432,26 @@ const MedicineDetailPage: React.FC = () => {
           <section className="bg-white mt-6 rounded-lg p-4 shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold">Need help choosing a medicine?</h3>
-                <p className="text-sm text-subtle">Talk to our pharmacist for free guidance on interactions and dosing.</p>
+                <h3 className="text-lg font-semibold">
+                  Need help choosing a medicine?
+                </h3>
+                <p className="text-sm text-subtle">
+                  Talk to our pharmacist for free guidance on interactions and
+                  dosing.
+                </p>
               </div>
 
               <div className="flex gap-3">
-                <Link to="/contact" className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-white font-medium shadow">
+                <Link
+                  to="/contact"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-white font-medium shadow"
+                >
                   Contact Pharmacist
                 </Link>
-                <Link to="/medicines" className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-slate-200 text-slate-700">
+                <Link
+                  to="/medicines"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-slate-200 text-slate-700"
+                >
                   Browse Medicines
                 </Link>
               </div>
@@ -363,11 +465,23 @@ const MedicineDetailPage: React.FC = () => {
 
 export default MedicineDetailPage;
 
-function TabButton({ id, label, Icon, active, onClick }: { id: string; label: string; Icon: React.ElementType; active: boolean; onClick: () => void; }) {
+function TabButton({
+  id,
+  label,
+  Icon,
+  active,
+  onClick,
+}: {
+  id: string;
+  label: string;
+  Icon: React.ElementType;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
-      className={`py-3 px-1 border-b-2 inline-flex items-center gap-2 text-sm ${active ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+      className={`py-3 px-1 border-b-2 inline-flex items-center gap-2 text-sm ${active ? "border-primary text-primary" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}
       role="tab"
       aria-selected={active}
       id={`tab-${id}`}
