@@ -19,5 +19,5 @@ export default defineConfig(({ mode }) => ({
     },
   },
   // 👇 GitHub Pages base path (important)
-  base: mode === "production" ? "/pharmaview-catalogue/" : "/",
+  base: "./",
 }));
