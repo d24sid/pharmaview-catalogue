@@ -57,11 +57,17 @@ const MedicineDetailPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<number>(0);
   const [copying, setCopying] = useState(false);
   const CACHE_KEY = "pharma_medicines_cache";
+  const refetch = async () => {
+    localStorage.removeItem(CACHE_KEY);
+    await fetchAndProcessData();
+  };
   const fetchAndProcessData = useCallback(async () => {
     const url = `https://docs.google.com/spreadsheets/d/1ZDO0G2YTgxcXrK-Zw4sBofPXtcdsvirrSs4fKdnZIQI/gviz/tq?tqx=out:json&gid=0`;
 
     try {
+      console.log("Fetching medicines data from", url);
       const cached = localStorage.getItem(CACHE_KEY);
+      console.log("Checking cache for medicines data...", id);
       if (cached) {
         const parsed = JSON.parse(cached);
         const cacheTime = parsed.timestamp;
@@ -69,7 +75,10 @@ const MedicineDetailPage: React.FC = () => {
         const ageMinutes = (now - cacheTime) / (1000 * 60);
         if (ageMinutes < 60) {
           setMedicines(parsed.data);
+          console.log("Loaded medicines from cache", parsed.data);
           return;
+        } else {
+          refetch();
         }
       } else {
         const response = await fetch(url);
@@ -86,6 +95,7 @@ const MedicineDetailPage: React.FC = () => {
 
         const now = new Date();
         setMedicines(mappedMedicines);
+        console.log("Fetched and processed medicines data", mappedMedicines);
 
         localStorage.setItem(
           CACHE_KEY,
@@ -106,7 +116,7 @@ const MedicineDetailPage: React.FC = () => {
     fetchAndProcessData();
   }, []);
   const medicine: Medicine | undefined = medicines.find(
-    (m: Medicine) => m.id === id,
+    (m: Medicine) => m.id == id,
   );
 
   const images = useMemo(() => {
