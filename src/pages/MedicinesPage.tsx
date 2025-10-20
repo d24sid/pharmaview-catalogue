@@ -15,7 +15,6 @@ const ITEMS_PER_PAGE = 24;
 const safeString = (v: any) => (v ? String(v) : '');
 
 const MedicinesPage: React.FC = () => {
-  // const { medicines = [], loading, error, refetch } = useMedicines();
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +26,6 @@ const MedicinesPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Nice-to-have toggle: "Load more" vs classic pagination
   const [useLoadMore, setUseLoadMore] = useState(false);
   const [itemsToShow, setItemsToShow] = useState(ITEMS_PER_PAGE);
 
@@ -60,14 +58,11 @@ const MedicinesPage: React.FC = () => {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error("Failed to fetch or process medicines data:", err);
       setError(errorMessage);
-      // Fallback to cache if fetching fails
-      // loadFromCache(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // keyboard shortcut "/" to focus search (but not when typing into inputs)
   useEffect(() => {
     fetchAndProcessData();
     const onKey = (e: KeyboardEvent) => {
@@ -80,7 +75,6 @@ const MedicinesPage: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // derive unique categories / manufacturers defensively
   const { uniqueCategories, uniqueManufacturers } = useMemo(() => {
     const categories = new Set<string>();
     const manufacturers = new Set<string>();
@@ -96,11 +90,9 @@ const MedicinesPage: React.FC = () => {
     };
   }, [medicines]);
 
-  // filter + sort
   const filteredAndSortedMedicines = useMemo(() => {
     const searchLower = debouncedSearchTerm.trim().toLowerCase();
     const filtered = medicines.filter((med) => {
-      // guard for missing fields
       const name = safeString(med.name).toLowerCase();
       const generic = safeString(med.genericName).toLowerCase();
       const brand = safeString(med.brand).toLowerCase();
@@ -131,9 +123,7 @@ const MedicinesPage: React.FC = () => {
     return sorted;
   }, [medicines, debouncedSearchTerm, categoryFilter, manufacturerFilter, prescriptionFilter, sortOrder]);
 
-  // pagination / load more handling
   useEffect(() => {
-    // whenever filters/search/change, reset to first page or reset itemsToShow
     setCurrentPage(1);
     setItemsToShow(ITEMS_PER_PAGE);
   }, [debouncedSearchTerm, categoryFilter, manufacturerFilter, prescriptionFilter, sortOrder]);
@@ -166,7 +156,6 @@ const MedicinesPage: React.FC = () => {
     setItemsToShow(ITEMS_PER_PAGE);
   };
 
-  // removable filter chips
   const activeChips = useMemo(() => {
     const chips: { key: string; label: string; onRemove: () => void }[] = [];
     if (searchTerm.trim()) chips.push({ key: 'q', label: `Search: "${searchTerm.trim()}"`, onRemove: () => setSearchTerm('') });
@@ -178,12 +167,10 @@ const MedicinesPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      {/* Sticky filter bar */}
       <div className="bg-white p-4 rounded-lg shadow-md mb-4 sticky top-16 z-40">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
           <div className="relative col-span-1 md:col-span-2 lg:col-span-2">
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search by name, generic, or brand <span className="text-xs text-slate-400 ml-1"> (press “/” to focus)</span></label>
-            <Search className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search by name, generic, or brand </label>
             <input
               ref={searchInputRef}
               type="text"
@@ -191,18 +178,9 @@ const MedicinesPage: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="e.g., Paracetamol, Azithromycin..."
-              className="pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary w-full"
+              className="pl-3 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary w-full"
               aria-label="Search medicines"
             />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                aria-label="Clear search"
-                className="absolute right-2 top-9 p-1.5 rounded-md text-gray-500 hover:bg-gray-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
           </div>
 
           <div>
@@ -289,7 +267,8 @@ const MedicinesPage: React.FC = () => {
         {/* Active filter chips */}
         <div className="mt-3 flex flex-wrap gap-2">
           {activeChips.length === 0 ? (
-            <div className="text-sm text-slate-500">No active filters — showing everything.</div>
+            // <div className="text-sm text-slate-500">No active filters — showing everything.</div>
+            <></>
           ) : (
             activeChips.map((chip) => (
               <button
@@ -323,7 +302,6 @@ const MedicinesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Loading / Error / Empty / Results */}
       {loading && (
         <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" : "space-y-4"}>
           {Array.from({ length: Math.min(8, ITEMS_PER_PAGE / 3) }).map((_, i) => <MedicineCardSkeleton key={i} view={viewMode} />)}

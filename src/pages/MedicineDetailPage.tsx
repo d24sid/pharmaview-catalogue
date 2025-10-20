@@ -1,262 +1,343 @@
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Package, Building, Pill, AlertTriangle, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { categories } from "@/data/medicines";
-import medicineImage from "@/assets/medicine-generic.jpg";
+import React, { useCallback, useMemo, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Pill,
+  Info,
+  Activity,
+  AlertTriangle,
+  Share2,
+  Copy,
+  Tag,
+  Star,
+} from 'lucide-react';
+import { gvizResponseToRows } from '@/data/medicines';
+import { mapRowsToMedicines } from '@/services/dataMapping';
+import { parseGvizText } from '@/services/gvizService';
 
-const [medicines, setMedicines] = (() => {
-  const medicines = JSON.parse(localStorage.getItem('medicines') || '[]');
-  return medicines;
-})();
+type Medicine = {
+  id: string;
+  name: string;
+  genericName?: string;
+  brand?: string;
+  category?: string;
+  manufacturer?: string;
+  form?: string;
+  dosage?: string;
+  imageUrl?: string | null;
+  price: number;
+  mrp?: number;
+  gst?: number;
+  stock?: number;
+  prescription?: boolean;
+  description?: string;
+  uses?: string[] | string;
+  sideEffects?: string[] | string;
+  contraindications?: string[] | string;
+  rating?: number;
+  // raw removed / ignored
+};
 
-const MedicineDetailPage = () => {
-  const { id } = useParams();
-  const medicine = medicines.find(m => m.id === id);
+const fallbackImage = (name = 'Medicine') =>
+  `https://placehold.co/1200x1200/0D9488/FFFFFF?text=${encodeURIComponent(name.charAt(0) || 'M')}`;
+
+const currency = (n: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n);
+
+const MedicineDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [activeTab, setActiveTab] = useState<'description' | 'uses' | 'sideEffects' | 'contraindications'>('description');
+  const [selectedImage, setSelectedImage] = useState<number>(0);
+  const [copying, setCopying] = useState(false);
+  const CACHE_KEY = 'pharma_medicines_cache';
+    const fetchAndProcessData = useCallback(async () => {
+  
+      const url = `https://docs.google.com/spreadsheets/d/1ZDO0G2YTgxcXrK-Zw4sBofPXtcdsvirrSs4fKdnZIQI/gviz/tq?tqx=out:json&gid=0`;
+  
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Network response was not ok: ${response.statusText}`);
+        }
+        const text = await response.text();
+        const gvizResponse = parseGvizText(text);
+        const rows = gvizResponseToRows(gvizResponse);
+        const mappedMedicines = mapRowsToMedicines(rows);
+  
+        const now = new Date();
+        setMedicines(mappedMedicines);
+  
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          timestamp: now.getTime(),
+          data: mappedMedicines,
+        }));
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+        console.error("Failed to fetch or process medicines data:", err);
+      } 
+    }, []);
+
+  const medicine: Medicine | undefined = medicines.find((m: Medicine) => m.id === id);
+
+  const images = useMemo(() => {
+    if (!medicine) return [];
+    const list: string[] = [];
+    if (medicine.imageUrl) list.push(medicine.imageUrl);
+    if (list.length === 0) list.push(fallbackImage(medicine.name));
+    return list;
+  }, [medicine]);
 
   if (!medicine) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-        <Card className="border-0 shadow-medium">
-          <CardContent className="p-12 text-center space-y-4">
-            <div className="text-4xl">💊</div>
-            <h2 className="text-2xl font-poppins font-bold">Medicine Not Found</h2>
-            <p className="text-muted-foreground">The requested medicine could not be found.</p>
-            <Button asChild variant="outline">
-              <Link to="/medicines">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Medicines
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="text-center py-20">
+        <h2 className="text-2xl font-bold mb-4">Medicine not found</h2>
+        <Link to="/medicines" className="text-primary hover:underline">
+          &larr; Back to Catalog
+        </Link>
       </div>
     );
   }
 
-  const category = categories.find(c => c.id === medicine.category);
-  
-  const getAvailabilityColor = (availability: string) => {
-    switch (availability) {
-      case 'In Stock':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'Low Stock':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Out of Stock':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+  const inStock = (medicine.stock ?? 0) > 0;
+  const hasPrescription = !!medicine.prescription;
+  const effectivePrice = medicine.price;
+  const hasDiscount = !!medicine.mrp && medicine.mrp > medicine.price;
+
+  const handleCopyLink = async () => {
+    const url = window.location.href;
+    try {
+      setCopying(true);
+      await navigator.clipboard.writeText(url);
+      setTimeout(() => setCopying(false), 700);
+      // subtle feedback — replace with toast in future if desired
+      alert('Link copied to clipboard');
+    } catch {
+      setCopying(false);
+      alert('Copy failed — please copy manually');
+    }
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: medicine.name,
+      text: `Check out ${medicine.name} on People Kind Pharma`,
+      url: window.location.href,
+    };
+    if ((navigator as any).share) {
+      try {
+        await (navigator as any).share(shareData);
+      } catch {
+        // user canceled or share unsupported — fallback silently
+      }
+    } else {
+      handleCopyLink();
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
-      <div className="container mx-auto px-4 py-8">
-        
-        {/* Back Navigation */}
-        <div className="mb-6">
-          <Button asChild variant="ghost" className="hover:bg-primary/10">
-            <Link to="/medicines">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Medicines
-            </Link>
-          </Button>
+    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      <Link to="/medicines" className="inline-flex items-center mb-6 text-primary hover:underline">
+        <ArrowLeft className="w-4 h-4 mr-2" />
+        Back to Catalog
+      </Link>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        {/* Left: Gallery */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="rounded-lg overflow-hidden shadow-lg bg-white">
+            <div className="relative w-full aspect-square bg-slate-50">
+              <img
+                src={images[selectedImage]}
+                alt={`${medicine.name} image ${selectedImage + 1}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = fallbackImage(medicine.name);
+                }}
+              />
+              {/* rating pill */}
+              <div className="absolute top-3 left-3 inline-flex items-center gap-1 bg-white/90 text-slate-900 px-3 py-1 rounded-full text-sm shadow">
+                <Star className="w-4 h-4 text-yellow-500" />
+                <span className="font-medium">{(medicine.rating ?? 4.6).toFixed(1)}</span>
+              </div>
+
+              {/* prescription badge */}
+              {hasPrescription && (
+                <div className="absolute top-3 right-3 inline-flex items-center gap-2 bg-orange-50 text-accent px-3 py-1 rounded-full text-sm border border-orange-100">
+                  <Pill className="w-4 h-4" />
+                  Prescription Required
+                </div>
+              )}
+            </div>
+
+            {/* thumbnails */}
+            <div className="p-3 flex items-center gap-3 overflow-x-auto">
+              {images.map((src, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedImage(idx)}
+                  className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 ${
+                    idx === selectedImage ? 'border-primary' : 'border-transparent'
+                  } focus:outline-none`}
+                  aria-current={idx === selectedImage}
+                >
+                  <img src={src} alt={`${medicine.name} thumb ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* small product meta */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-100">
+            <p className="text-sm text-subtle uppercase font-semibold">{medicine.brand}</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-text mb-1">{medicine.name}</h1>
+            <p className="text-sm text-subtle">{medicine.genericName}</p>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {medicine.dosage && (
+                <span className="inline-flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-full text-sm border border-slate-100">
+                  <Tag className="w-4 h-4" /> {medicine.dosage}
+                </span>
+              )}
+              <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${inStock ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                {inStock ? `${medicine.stock} in stock` : 'Out of stock'}
+              </span>
+              <span className="inline-flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-full text-sm border border-slate-100">
+                {medicine.form ?? 'Form unknown'}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* Medicine Image and Basic Info */}
-          <div className="space-y-6">
-            <Card className="border-0 shadow-soft">
-              <CardContent className="p-0">
-                <div className="relative">
-                  <img 
-                    src={medicineImage} 
-                    alt={medicine.name}
-                    className="w-full h-96 object-cover rounded-t-lg"
-                  />
-                  <div className="absolute top-4 left-4 flex gap-2">
-                    {category && (
-                      <Badge className="bg-white/90 text-foreground hover:bg-white">
-                        {category.icon} {category.name}
-                      </Badge>
+        {/* Right: Details */}
+        <div className="lg:col-span-3">
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100 mb-6">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+              <div>
+                <h2 className="text-3xl font-extrabold mb-1">{medicine.name}</h2>
+                <p className="text-sm text-subtle mb-3">{medicine.genericName} • {medicine.manufacturer}</p>
+
+                <div className="flex items-baseline gap-3">
+                  <div className="flex items-end gap-3">
+                    <span className="text-4xl font-extrabold text-primary">{currency(effectivePrice)}</span>
+                    {hasDiscount && (
+                      <span className="text-sm line-through text-subtle">{currency(medicine.mrp!)}</span>
                     )}
                   </div>
-                  {medicine.prescription && (
-                    <div className="absolute top-4 right-4">
-                      <Badge variant="outline" className="bg-white/90 border-primary text-primary">
-                        Prescription Required
-                      </Badge>
-                    </div>
+
+                  <div className="ml-3 text-sm text-subtle">
+                    {medicine.gst ? <span>GST: {medicine.gst}%</span> : <span className="text-subtle">GST info not available</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* action row (mobile) */}
+              <div className="md:hidden flex items-center gap-3">
+                <button
+                  onClick={handleShare}
+                  title="Share"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-200 text-sm"
+                >
+                  <Share2 className="w-4 h-4" /> Share
+                </button>
+                <button
+                  onClick={handleCopyLink}
+                  title="Copy link"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-200 text-sm"
+                >
+                  <Copy className="w-4 h-4" /> Copy
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 text-sm text-subtle">
+              <strong>Category:</strong> {medicine.category ?? '—'} • <strong>Form:</strong> {medicine.form ?? '—'}
+            </div>
+          </div>
+
+          {/* Tabs + content */}
+          <div className="bg-white rounded-lg shadow-sm border border-slate-100">
+            <div className="border-b px-4">
+              <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+                <TabButton id="description" label="Description" Icon={Info} active={activeTab === 'description'} onClick={() => setActiveTab('description')} />
+                <TabButton id="uses" label="Uses" Icon={Activity} active={activeTab === 'uses'} onClick={() => setActiveTab('uses')} />
+                <TabButton id="sideEffects" label="Side Effects" Icon={AlertTriangle} active={activeTab === 'sideEffects'} onClick={() => setActiveTab('sideEffects')} />
+                <TabButton id="contraindications" label="Contraindications" Icon={AlertTriangle} active={activeTab === 'contraindications'} onClick={() => setActiveTab('contraindications')} />
+                <div className="ml-auto flex gap-2">
+                  <button onClick={handleShare} className="inline-flex items-center gap-2 py-3 px-2 text-sm border-l border-transparent hover:text-gray-700">
+                    <Share2 className="w-4 h-4" /> Share
+                  </button>
+                  <button onClick={handleCopyLink} className="inline-flex items-center gap-2 py-3 px-2 text-sm">
+                    <Copy className="w-4 h-4" /> Copy
+                  </button>
+                </div>
+              </nav>
+            </div>
+
+            <div className="p-6 space-y-4 min-h-[160px]">
+              {activeTab === 'description' && (
+                <div>
+                  <p className="text-sm leading-relaxed text-slate-700">{medicine.description ?? 'No description available.'}</p>
+                </div>
+              )}
+
+              {activeTab === 'uses' && (
+                <div>
+                  {Array.isArray(medicine.uses) ? (
+                    <ul className="list-disc list-inside space-y-2">
+                      {medicine.uses.map((u: string, i: number) => <li key={i}>{u}</li>)}
+                    </ul>
+                  ) : (
+                    <p className="text-sm">{medicine.uses ?? 'No data.'}</p>
                   )}
                 </div>
-                
-                <div className="p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Badge 
-                      className={`${getAvailabilityColor(medicine.availability)} border text-sm`}
-                    >
-                      {medicine.availability}
-                    </Badge>
-                    <div className="text-right">
-                      <div className="text-sm text-muted-foreground">Stock Available</div>
-                      <div className="font-semibold">{medicine.stock} units</div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              )}
 
-            {/* Price and Purchase Info */}
-            <Card className="border-0 shadow-soft">
-              <CardContent className="p-6 space-y-4">
-                <div className="text-center space-y-2">
-                  <div className="text-4xl font-bold text-primary">${medicine.price}</div>
-                  <div className="text-muted-foreground">per {medicine.form.toLowerCase()}</div>
+              {activeTab === 'sideEffects' && (
+                <div>
+                  {Array.isArray(medicine.sideEffects) ? (
+                    <ul className="list-disc list-inside space-y-2">
+                      {medicine.sideEffects.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                    </ul>
+                  ) : (
+                    <p className="text-sm">{medicine.sideEffects ?? 'No data.'}</p>
+                  )}
                 </div>
-                
-                <Separator />
-                
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Dosage:</span>
-                    <span className="font-medium">{medicine.dosage}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Form:</span>
-                    <span className="font-medium">{medicine.form}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Manufacturer:</span>
-                    <span className="font-medium">{medicine.manufacturer}</span>
-                  </div>
-                </div>
+              )}
 
-                <Button 
-                  className="w-full bg-primary hover:bg-primary/90 shadow-glow" 
-                  size="lg"
-                  disabled={medicine.availability === 'Out of Stock'}
-                >
-                  {medicine.availability === 'Out of Stock' ? 'Currently Unavailable' : 'Contact for Quote'}
-                </Button>
-              </CardContent>
-            </Card>
+              {activeTab === 'contraindications' && (
+                <div>
+                  {Array.isArray(medicine.contraindications) ? (
+                    <ul className="list-disc list-inside space-y-2">
+                      {medicine.contraindications.map((c: string, i: number) => <li key={i}>{c}</li>)}
+                    </ul>
+                  ) : (
+                    <p className="text-sm">{medicine.contraindications ?? 'No data.'}</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Detailed Information */}
-          <div className="space-y-6">
-            
-            {/* Main Details */}
-            <Card className="border-0 shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Pill className="h-5 w-5 text-primary" />
-                  {medicine.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-1">
-                    Generic Name
-                  </h4>
-                  <p className="font-medium">{medicine.genericName}</p>
-                </div>
-                
-                <div>
-                  <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-1">
-                    Brand
-                  </h4>
-                  <p className="font-medium">{medicine.brand}</p>
-                </div>
-                
-                <div>
-                  <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-2">
-                    Description
-                  </h4>
-                  <p className="text-muted-foreground leading-relaxed">{medicine.description}</p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Quick CTA band */}
+          <section className="bg-white mt-6 rounded-lg p-4 shadow-sm border border-slate-100">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold">Need help choosing a medicine?</h3>
+                <p className="text-sm text-subtle">Talk to our pharmacist for free guidance on interactions and dosing.</p>
+              </div>
 
-            {/* Uses */}
-            <Card className="border-0 shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Info className="h-5 w-5 text-secondary" />
-                  Medical Uses
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {medicine.uses.map((use, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {use}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Side Effects */}
-            <Card className="border-0 shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                  Possible Side Effects
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1">
-                  {medicine.sideEffects.map((effect, index) => (
-                    <li key={index} className="text-sm text-muted-foreground flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                      {effect}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Contraindications */}
-            <Card className="border-0 shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-red-600" />
-                  Contraindications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1">
-                  {medicine.contraindications.map((contraindication, index) => (
-                    <li key={index} className="text-sm text-muted-foreground flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                      {contraindication}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Important Notice */}
-            <Card className="border-0 shadow-soft bg-muted/50">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-primary mb-1">Important Medical Notice</p>
-                    <p className="text-muted-foreground leading-relaxed">
-                      This medicine should only be used under proper medical supervision. 
-                      Always consult with a qualified healthcare professional before use. 
-                      Keep out of reach of children.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
+              <div className="flex gap-3">
+                <Link to="/contact" className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-accent text-white font-medium shadow">
+                  Contact Pharmacist
+                </Link>
+                <Link to="/medicines" className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-slate-200 text-slate-700">
+                  Browse Medicines
+                </Link>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
@@ -264,3 +345,19 @@ const MedicineDetailPage = () => {
 };
 
 export default MedicineDetailPage;
+
+function TabButton({ id, label, Icon, active, onClick }: { id: string; label: string; Icon: React.ElementType; active: boolean; onClick: () => void; }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`py-3 px-1 border-b-2 inline-flex items-center gap-2 text-sm ${active ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+      role="tab"
+      aria-selected={active}
+      id={`tab-${id}`}
+      aria-controls={`panel-${id}`}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
+}
