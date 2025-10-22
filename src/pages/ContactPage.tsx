@@ -43,10 +43,10 @@ const ContactPage = () => {
               <div className="flex items-center space-x-3 text-sm">
                 <Mail className="h-5 w-5 text-primary" />
                 <a
-                  href="mailto:info@pharmaview.com"
+                  href="mailto:peoplekindpharma01@gmail.com"
                   className="text-muted-foreground hover:text-primary"
                 >
-                  info@pharmaview.com
+                  peoplekindpharma01@gmail.com
                 </a>
               </div>
               <div className="flex items-start space-x-3 text-sm">

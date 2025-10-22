@@ -76,17 +76,17 @@ const Footer = () => {
               <div className="flex items-center space-x-3 text-sm">
                 <Mail className="h-4 w-4 text-primary" />
                 <span className="text-muted-foreground">
-                  info@pharmaview.com
+                  peoplekindpharma01@gmail.com
                 </span>
               </div>
               <div className="flex items-start space-x-3 text-sm">
                 <MapPin className="h-4 w-4 text-primary mt-0.5" />
                 <span className="text-muted-foreground">
-                  DANIYAWA BAZAR
+                  Daniyawa Bazar
                   <br />
-                  CHILKA-PAR, HILSA ROAD
+                  Near Overbridge, Chilka-Paar, Hilsa Road
                   <br />
-                  PATNA-801304
+                  Patna-801304
                 </span>
               </div>
             </div>
@@ -101,9 +101,7 @@ const Footer = () => {
               <div className="flex items-center space-x-3 text-sm">
                 <Clock className="h-4 w-4 text-primary" />
                 <div className="text-muted-foreground">
-                  <div>Mon - Fri: 8:00 AM - 8:00 PM</div>
-                  <div>Sat: 9:00 AM - 6:00 PM</div>
-                  <div>Sun: 10:00 AM - 4:00 PM</div>
+                  <div>Mon - Sun: 7:00 AM - 9:00 PM</div>
                 </div>
               </div>
             </div>
